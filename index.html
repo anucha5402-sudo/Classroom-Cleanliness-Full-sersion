@@ -9,37 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
-<!-- Firebase (ใช้เมื่อกรอกค่าใน firebase-config.js แล้ว ถ้ายังไม่กรอก ระบบจะเก็บข้อมูลในเครื่องแทน) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
 </head>
-
-  <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyDY6B-JRflV9gboRvhozO8o3Deb8hJP8aI",
-    authDomain: "classroomrecap-c89b1.firebaseapp.com",
-    projectId: "classroomrecap-c89b1",
-    storageBucket: "classroomrecap-c89b1.firebasestorage.app",
-    messagingSenderId: "12278751490",
-    appId: "1:12278751490:web:57d017548361955325621b",
-    measurementId: "G-M8ZT4T9EZ5"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-  
 <body>
 <div class="app">
 
@@ -210,11 +180,11 @@
   <div class="modal-card" id="modal-card"></div>
 </div>
 
-<!-- 1. ดึง SDK ของ Firebase (เวอร์ชัน 8 ที่สอดคล้องกับ script.js) -->
+<!-- 1. ดึง SDK ของ Firebase เวอร์ชัน 8 ( Compat ) -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-<!-- 2. ใส่ค่า Config จากโปรเจกต์ของคุณ (classroomrecap-c89b1) -->
+<!-- 2. กำหนดค่า Firebase Config ของโปรเจกต์ classroomrecap-c89b1 -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyDY6B-JRflV9gboRvhozO8o3Deb8hJP8aI",
@@ -227,12 +197,7 @@
   };
 </script>
 
-<!-- 3. สคริปต์หลักของแอปพลิเคชัน -->
-<script src="script.js"></script>
-
-
-
-  
+<!-- 3. โหลดไฟล์ script.js หลักเพียงครั้งเดียว -->
 <script src="script.js"></script>
 </body>
 </html>
