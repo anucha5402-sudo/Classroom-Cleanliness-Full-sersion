@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบให้คะแนนความสะอาดห้องเรียน - โรงเรียนดารุสสลามวิทยา</title>
+<link rel="icon" href="assets/logo-school.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+
+<!-- Firebase (ใช้เมื่อกรอกค่าใน firebase-config.js แล้ว ถ้ายังไม่กรอก ระบบจะเก็บข้อมูลในเครื่องแทน) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <div id="page-landing" class="landing">
+    <div class="brand-header">
+      <img class="logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
+      <div class="brand-text">
+        <div class="school-name">โรงเรียนดารุสสลามวิทยา</div>
+        <div class="app-name">ระบบให้คะแนนความสะอาดห้องเรียน</div>
+      </div>
+    </div>
+    <p class="subtitle">ม.1 - ม.6 ห้อง /1 และ /2</p>
+    <div id="conn-badge-landing" style="margin-bottom: 10px;"></div>
+    <div class="landing-buttons">
+      <button class="big-btn view" id="btn-go-viewer">📊 ดูภาพรวมคะแนน</button>
+      <button class="big-btn enter" id="btn-go-login">🔐 เข้าสู่ระบบผู้ตรวจ</button>
+    </div>
+  </div>
+
+  <div id="page-login" style="display:none;">
+    <div class="card login-card">
+      <h2>เข้าสู่ระบบผู้ตรวจ</h2>
+      <label>รหัสผ่าน</label>
+      <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน">
+      <div id="login-msg" style="margin-top:10px;"></div>
+      <div class="row" style="margin-top:14px;">
+        <button class="primary" id="login-submit">เข้าสู่ระบบ</button>
+        <button class="ghost" id="login-cancel">ย้อนกลับ</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-viewer" style="display:none;">
+    <div class="topbar">
+      <h1 style="margin:0;">ภาพรวมคะแนนความสะอาด</h1>
+      <div class="row" style="gap:8px;">
+        <span id="conn-badge-viewer"></span>
+        <button class="ghost" id="viewer-back">ย้อนกลับ</button>
+      </div>
+    </div>
+    <div class="subtabs">
+      <button class="subtab active" data-vtab="daily">ภาพรวมรายวัน</button>
+      <button class="subtab" data-vtab="weekly">ค่าเฉลี่ยรายสัปดาห์</button>
+    </div>
+
+    <div id="vpanel-daily">
+      <div class="card">
+        <div class="field" style="max-width:220px;">
+          <label>เลือกวันที่</label>
+          <input type="date" id="daily-date">
+        </div>
+      </div>
+      <div class="card" id="daily-grid-container">
+        <div class="empty">กำลังโหลด...</div>
+      </div>
+    </div>
+
+    <div id="vpanel-weekly" style="display:none;">
+      <div class="card">
+        <div class="field" style="max-width:260px;">
+          <label>เลือกสัปดาห์</label>
+          <select id="week-select"></select>
+        </div>
+      </div>
+      <div class="legend-grid" id="weekly-legend"></div>
+      <div class="card" id="weekly-table-container">
+        <div class="empty">กำลังโหลด...</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-entry" style="display:none;">
+    <div class="topbar">
+      <h1 style="margin:0;">กรอกข้อมูลการตรวจ</h1>
+      <div class="row" style="gap:8px;">
+        <span id="conn-badge-entry"></span>
+        <button class="ghost" id="entry-logout">ออกจากระบบ</button>
+      </div>
+    </div>
+
+    <div class="subtabs">
+      <button class="subtab active" data-etab="form">กรอกข้อมูล</button>
+      <button class="subtab" data-etab="mine">ประวัติ / จัดการ</button>
+      <button class="subtab" data-etab="pw">เปลี่ยนรหัสผ่าน</button>
+    </div>
+
+    <div id="epanel-form">
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label>ระดับชั้น</label>
+            <select id="grade"></select>
+          </div>
+          <div class="field">
+            <label>ห้อง</label>
+            <select id="room">
+              <option value="1">/1</option>
+              <option value="2">/2</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>วันที่ตรวจ</label>
+            <input type="date" id="date">
+          </div>
+          <div class="field">
+            <label>ผู้ตรวจ (ถ้ามี)</label>
+            <input type="text" id="inspector" placeholder="ชื่อผู้ตรวจ">
+          </div>
+        </div>
+      </div>
+
+      <div class="score-bar">
+        <div>
+          <div class="score-label">คะแนนรวม</div>
+          <div class="score-num good" id="score-total">100</div>
+          <div class="breakdown" id="score-breakdown"></div>
+        </div>
+        <button class="primary" id="save-btn">บันทึกผลการตรวจ</button>
+      </div>
+
+      <div id="msg-area"></div>
+      <div id="criteria-container"></div>
+
+      <div class="card severity-box">
+        <div class="checkbox-row">
+          <input type="checkbox" id="severity-enable">
+          <label for="severity-enable" style="margin:0;">พบความไม่เป็นระเบียบขั้นสุด (เช่น โต๊ะหัก / อุปกรณ์ชำรุด)</label>
+        </div>
+        <div id="severity-fields" style="display:none;">
+          <label>หมายเหตุ (จำเป็นต้องกรอกก่อนเลือกระดับความรุนแรง)</label>
+          <textarea id="severity-remark" placeholder="อธิบายลักษณะความเสียหาย เช่น ขาโต๊ะหักแถวที่ 2"></textarea>
+          <label style="margin-top:10px;">ระดับความรุนแรง</label>
+          <div class="levels" id="severity-levels"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="epanel-mine" style="display:none;">
+      <div class="card" id="history-container">
+        <div class="empty">กำลังโหลด...</div>
+      </div>
+    </div>
+
+    <div id="epanel-pw" style="display:none;">
+      <div class="card" style="max-width:360px;">
+        <h2>เปลี่ยนรหัสผ่านผู้ตรวจ</h2>
+        <label>รหัสผ่านปัจจุบัน</label>
+        <input type="password" id="pw-current">
+        <label style="margin-top:10px;">รหัสผ่านใหม่</label>
+        <input type="password" id="pw-new">
+        <div id="pw-msg" style="margin-top:10px;"></div>
+        <button class="primary" id="pw-submit" style="margin-top:14px;">บันทึกรหัสผ่านใหม่</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-footer">
+    <img src="assets/logo-council.png" alt="ตราองค์การบริหารกิจการนักเรียน">
+    <div>
+      <div class="credit-title">องค์การบริหารกิจการนักเรียนโรงเรียนดารุสสลามวิทยา</div>
+      <div>Students Council of Darussalamwitya &middot; จัดทำระบบนี้เพื่อโรงเรียน</div>
+    </div>
+  </div>
+
+</div>
+
+<div id="modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
