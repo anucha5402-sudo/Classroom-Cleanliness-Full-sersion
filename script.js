@@ -4,7 +4,8 @@ const CRITERIA = [
   { key: 'trashOn', label: 'ขยะบนโต๊ะ', icon: '📄', levels: ['สะอาด','ค่อนข้างสะอาด','ปานกลาง','ค่อนข้างไม่สะอาด','ไม่สะอาด'], pts: [0,3,7,11,15] },
   { key: 'chair', label: 'ความเป็นระเบียบของเก้าอี้', icon: '🪑', levels: ['เป็นระเบียบ','ค่อนข้างเป็นระเบียบ','ปานกลาง','ค่อนข้างไม่เป็นระเบียบ','ไม่เป็นระเบียบ'], pts: [0,3,7,11,15] },
   { key: 'desk', label: 'ความเป็นระเบียบของโต๊ะ', icon: '🗄️', levels: ['เป็นระเบียบ','ค่อนข้างเป็นระเบียบ','ปานกลาง','ค่อนข้างไม่เป็นระเบียบ','ไม่เป็นระเบียบ'], pts: [0,3,7,11,15] },
-  { key: 'fan', label: 'พัดลม (ปิดหลังเลิกใช้งาน ทั้งหมด 4 ตัว)', icon: '🌀', levels: ['ปิดทั้งหมด (0 ตัวไม่ปิด)','ไม่ปิด 1 ตัว','ไม่ปิด 2 ตัว','ไม่ปิด 3 ตัว','ไม่ปิด 4 ตัว'], pts: [0,3,5,7,10] }
+  { key: 'fan', label: 'พัดลม (ปิดหลังเลิกใช้งาน ทั้งหมด 4 ตัว)', icon: '🌀', levels: ['ปิดทั้งหมด (0 ตัวไม่ปิด)','ไม่ปิด 1 ตัว','ไม่ปิด 2 ตัว','ไม่ปิด 3 ตัว','ไม่ปิด 4 ตัว'], pts: [0,3,5,7,10] },
+  { key: 'light', label: 'ไฟ (ปิดหลังเลิกใช้งาน)', icon: '💡', levels: ['ปิด','ไม่ปิด'], pts: [0,8] }
 ];
 const SEVERITY = [
   { value: 1, label: 'ค่อนข้างรุนแรง', pts: 10 },
@@ -18,7 +19,7 @@ GRADES.forEach(g => { ROOM_CODES.push(`${g}/1`); ROOM_CODES.push(`${g}/2`); });
 const DEFAULT_PASSWORD = 'inspect2025';
 const PW_KEY = 'app-password';
 
-const state = { selections: {}, severityLevel: null };
+const state = { selections: {}, severityLevel: null, severityPhoto: null };
 
 // ==========================================================================
 // ชั้นเก็บข้อมูล (Storage layer)
@@ -180,12 +181,15 @@ function buildBreakdownRowsHtml(record) {
   if (record.severity) {
     const sev = SEVERITY.find(s => s.value === record.severity.level);
     rows += `
-      <div class="modal-breakdown-row">
-        <div>
-          <div class="mb-label">⚠️ กรณีพิเศษ: ${sev ? sev.label : ''}</div>
-          <div class="mb-sub">${record.severity.remark || ''}</div>
+      <div class="modal-breakdown-row" style="display:block;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div class="mb-label">⚠️ กรณีพิเศษ: ${sev ? sev.label : ''}</div>
+            <div class="mb-sub">${record.severity.remark || ''}</div>
+          </div>
+          <div class="mb-pts neg">-${sev ? sev.pts : 0}</div>
         </div>
-        <div class="mb-pts neg">-${sev ? sev.pts : 0}</div>
+        ${record.severity.photo ? `<img src="${record.severity.photo}" class="photo-thumb" style="margin-top:8px;" onclick="window.open('${record.severity.photo}','_blank')">` : ''}
       </div>
     `;
   }
@@ -217,6 +221,30 @@ function showRecordListModal(title, subtitle, records) {
   openModal(html);
 }
 
+// โมดัลดูรายละเอียดแบบเลือกวันที่ (ใช้กับค่าเฉลี่ยรายสัปดาห์ ที่อาจมีหลายวันในสัปดาห์เดียว)
+function showRecordDetailByDate(title, records) {
+  const byDate = {};
+  records.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+  const dates = Object.keys(byDate).sort().reverse();
+  let selectedDate = dates[0];
+
+  function render() {
+    const pills = dates.map(d => `<button type="button" class="date-pill ${d === selectedDate ? 'active' : ''}" data-date="${d}">${d}</button>`).join('');
+    const recs = byDate[selectedDate];
+    const html = `
+      <button class="modal-close-x" onclick="closeModal()">✕</button>
+      <h2>${title}</h2>
+      <div class="date-pill-row">${pills}</div>
+      ${recs.map(buildRecordBlockHtml).join('')}
+    `;
+    openModal(html);
+    document.querySelectorAll('.date-pill').forEach(p => {
+      p.addEventListener('click', () => { selectedDate = p.dataset.date; render(); });
+    });
+  }
+  render();
+}
+
 // ==========================================================================
 // การนำทางหน้า
 // ==========================================================================
@@ -232,6 +260,19 @@ document.getElementById('btn-go-login').addEventListener('click', () => {
   showPage('page-login');
 });
 document.getElementById('login-cancel').addEventListener('click', () => showPage('page-landing'));
+
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  });
+});
 
 async function getStoredPassword() {
   try {
@@ -361,6 +402,13 @@ function buildCriteria() {
 
 let lastScoreValue = 100;
 
+function updateScoreRing(total) {
+  const ring = document.getElementById('score-ring');
+  const pct = Math.max(0, Math.min(100, total));
+  const color = total < 0 ? 'var(--danger)' : total < 60 ? '#b17600' : 'var(--primary)';
+  ring.style.background = `conic-gradient(${color} ${pct}%, var(--border) 0)`;
+}
+
 function updateScore() {
   let deduction = 0;
   let parts = [];
@@ -383,15 +431,68 @@ function updateScore() {
   animateNumber(scoreEl, lastScoreValue, total, 260);
   lastScoreValue = total;
   scoreEl.className = 'score-num ' + (total < 0 ? 'neg' : total < 60 ? 'mid' : 'good');
+  updateScoreRing(total);
   document.getElementById('score-breakdown').textContent = parts.length ? parts.join(' | ') : 'ยังไม่มีการหักคะแนน';
   return total;
 }
+
+// ---------------- แนบรูปภาพประกอบกรณีพิเศษ ----------------
+function resizeImageFile(file, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotoPreview() {
+  const el = document.getElementById('severity-photo-preview');
+  if (!state.severityPhoto) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <div class="photo-thumb-wrap">
+      <img src="${state.severityPhoto}" class="photo-thumb" onclick="window.open('${state.severityPhoto}','_blank')">
+      <button type="button" class="photo-remove" id="photo-remove-btn">✕</button>
+    </div>
+  `;
+  document.getElementById('photo-remove-btn').addEventListener('click', () => {
+    state.severityPhoto = null;
+    document.getElementById('severity-photo-input').value = '';
+    renderPhotoPreview();
+  });
+}
+
+document.getElementById('severity-photo-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    state.severityPhoto = await resizeImageFile(file, 800, 0.7);
+    renderPhotoPreview();
+  } catch (err) {
+    showMsg(document.getElementById('msg-area'), 'ไม่สามารถอ่านไฟล์รูปภาพได้ กรุณาลองใหม่', 'err');
+  }
+});
 
 document.getElementById('severity-enable').addEventListener('change', (e) => {
   document.getElementById('severity-fields').style.display = e.target.checked ? 'block' : 'none';
   if (!e.target.checked) {
     state.severityLevel = null;
+    state.severityPhoto = null;
     document.getElementById('severity-remark').value = '';
+    document.getElementById('severity-photo-input').value = '';
+    renderPhotoPreview();
     document.querySelectorAll('#severity-levels .level-opt').forEach(o => o.classList.remove('selected'));
   }
   updateScore();
@@ -400,11 +501,14 @@ document.getElementById('severity-enable').addEventListener('change', (e) => {
 function resetFormAfterSave() {
   state.selections = {};
   state.severityLevel = null;
+  state.severityPhoto = null;
   document.querySelectorAll('#criteria-container .level-opt').forEach(o => o.classList.remove('selected'));
   document.querySelectorAll('#criteria-container input[type=radio]').forEach(r => { r.checked = false; });
   document.getElementById('severity-enable').checked = false;
   document.getElementById('severity-fields').style.display = 'none';
   document.getElementById('severity-remark').value = '';
+  document.getElementById('severity-photo-input').value = '';
+  renderPhotoPreview();
   document.querySelectorAll('#severity-levels .level-opt').forEach(o => o.classList.remove('selected'));
   updateScore();
 }
@@ -430,7 +534,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const record = {
     grade, room, date, inspector,
     selections: { ...state.selections },
-    severity: sevEnabled ? { level: state.severityLevel, remark } : null,
+    severity: sevEnabled ? { level: state.severityLevel, remark, photo: state.severityPhoto || null } : null,
     total,
     savedAt: Date.now()
   };
@@ -689,11 +793,7 @@ function renderWeekly(weekKey) {
       const code = row.dataset.code;
       const r = rows.find(x => x.code === code);
       if (!r || !r.recs) return;
-      showRecordListModal(
-        `รายละเอียดคะแนน ห้อง ${code}`,
-        `${group.label} &middot; ตรวจทั้งหมด ${r.recs.length} ครั้ง`,
-        r.recs
-      );
+      showRecordDetailByDate(`รายละเอียดคะแนน ห้อง ${code}`, r.recs);
     });
   });
 }

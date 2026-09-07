@@ -9,6 +9,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+<!-- Firebase (ใช้เมื่อกรอกค่าใน firebase-config.js แล้ว ถ้ายังไม่กรอก ระบบจะเก็บข้อมูลในเครื่องแทน) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 </head>
 <body>
 <div class="app">
@@ -33,7 +38,10 @@
     <div class="card login-card">
       <h2>เข้าสู่ระบบผู้ตรวจ</h2>
       <label>รหัสผ่าน</label>
-      <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน">
+      <div class="password-wrap">
+        <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน">
+        <button type="button" class="pw-toggle" data-target="login-password">👁</button>
+      </div>
       <div id="login-msg" style="margin-top:10px;"></div>
       <div class="row" style="margin-top:14px;">
         <button class="primary" id="login-submit">เข้าสู่ระบบ</button>
@@ -122,10 +130,16 @@
       </div>
 
       <div class="score-bar">
-        <div>
-          <div class="score-label">คะแนนรวม</div>
-          <div class="score-num good" id="score-total">100</div>
-          <div class="breakdown" id="score-breakdown"></div>
+        <div class="score-main">
+          <div class="score-ring" id="score-ring">
+            <div class="score-ring-inner">
+              <div class="score-num good" id="score-total">100</div>
+            </div>
+          </div>
+          <div>
+            <div class="score-label">คะแนนรวม</div>
+            <div class="breakdown" id="score-breakdown"></div>
+          </div>
         </div>
         <button class="primary" id="save-btn">บันทึกผลการตรวจ</button>
       </div>
@@ -141,6 +155,9 @@
         <div id="severity-fields" style="display:none;">
           <label>หมายเหตุ (จำเป็นต้องกรอกก่อนเลือกระดับความรุนแรง)</label>
           <textarea id="severity-remark" placeholder="อธิบายลักษณะความเสียหาย เช่น ขาโต๊ะหักแถวที่ 2"></textarea>
+          <label style="margin-top:10px;">แนบรูปภาพ (ถ้ามี)</label>
+          <input type="file" accept="image/*" id="severity-photo-input">
+          <div id="severity-photo-preview"></div>
           <label style="margin-top:10px;">ระดับความรุนแรง</label>
           <div class="levels" id="severity-levels"></div>
         </div>
@@ -157,9 +174,15 @@
       <div class="card" style="max-width:360px;">
         <h2>เปลี่ยนรหัสผ่านผู้ตรวจ</h2>
         <label>รหัสผ่านปัจจุบัน</label>
-        <input type="password" id="pw-current">
+        <div class="password-wrap">
+          <input type="password" id="pw-current">
+          <button type="button" class="pw-toggle" data-target="pw-current">👁</button>
+        </div>
         <label style="margin-top:10px;">รหัสผ่านใหม่</label>
-        <input type="password" id="pw-new">
+        <div class="password-wrap">
+          <input type="password" id="pw-new">
+          <button type="button" class="pw-toggle" data-target="pw-new">👁</button>
+        </div>
         <div id="pw-msg" style="margin-top:10px;"></div>
         <button class="primary" id="pw-submit" style="margin-top:14px;">บันทึกรหัสผ่านใหม่</button>
       </div>
@@ -180,24 +203,6 @@
   <div class="modal-card" id="modal-card"></div>
 </div>
 
-<!-- 1. ดึง SDK ของ Firebase เวอร์ชัน 8 ( Compat ) -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
-<!-- 2. กำหนดค่า Firebase Config ของโปรเจกต์ classroomrecap-c89b1 -->
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyDY6B-JRflV9gboRvhozO8o3Deb8hJP8aI",
-    authDomain: "classroomrecap-c89b1.firebaseapp.com",
-    projectId: "classroomrecap-c89b1",
-    storageBucket: "classroomrecap-c89b1.firebasestorage.app",
-    messagingSenderId: "12278751490",
-    appId: "1:12278751490:web:57d017548361955325621b",
-    measurementId: "G-M8ZT4T9EZ5"
-  };
-</script>
-
-<!-- 3. โหลดไฟล์ script.js หลักเพียงครั้งเดียว -->
 <script src="script.js"></script>
 </body>
 </html>
