@@ -16,6 +16,25 @@ const GRADES = ['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
 const ROOM_CODES = [];
 GRADES.forEach(g => { ROOM_CODES.push(`${g}/1`); ROOM_CODES.push(`${g}/2`); });
 
+const TEACHERS = {
+  'ม.1/1': ['อ.กุลวลี', 'อ.เจนจิรา'],
+  'ม.1/2': ['อ.เดือนเพ็ญ'],
+  'ม.2/1': ['อ.กรรณิการ์'],
+  'ม.2/2': ['อ.อัสมิง'],
+  'ม.3/1': ['อ.เกษรินทร์'],
+  'ม.3/2': ['อ.ขัตติยะ', 'อ.ชาญวิทย์'],
+  'ม.4/1': ['อ.อารีษา'],
+  'ม.4/2': ['อ.นวพร'],
+  'ม.5/1': ['อ.อินทีวร'],
+  'ม.5/2': ['อ.ธัญญาเรศ'],
+  'ม.6/1': ['อ.ธนาวุฒิ'],
+  'ม.6/2': ['อ.ธวัชชัย']
+};
+function teacherNamesFor(code) {
+  const t = TEACHERS[code];
+  return t ? t.join(' / ') : '';
+}
+
 const DEFAULT_PASSWORD = 'inspect2025';
 const PW_KEY = 'app-password';
 
@@ -248,12 +267,16 @@ function showRecordDetailByDate(title, records) {
 // ==========================================================================
 // การนำทางหน้า
 // ==========================================================================
+let isLoggedInInspector = false;
+
 document.getElementById('btn-go-viewer').addEventListener('click', () => {
   showPage('page-viewer');
   loadDaily();
   loadWeekly();
 });
-document.getElementById('viewer-back').addEventListener('click', () => showPage('page-landing'));
+document.getElementById('viewer-back').addEventListener('click', () => {
+  showPage(isLoggedInInspector ? 'page-entry' : 'page-landing');
+});
 document.getElementById('btn-go-login').addEventListener('click', () => {
   document.getElementById('login-password').value = '';
   document.getElementById('login-msg').innerHTML = '';
@@ -288,6 +311,7 @@ document.getElementById('login-submit').addEventListener('click', async () => {
   const msgEl = document.getElementById('login-msg');
   const correct = await getStoredPassword();
   if (entered === correct) {
+    isLoggedInInspector = true;
     showPage('page-entry');
     showEntryTab('form');
   } else {
@@ -295,7 +319,16 @@ document.getElementById('login-submit').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('entry-logout').addEventListener('click', () => showPage('page-landing'));
+document.getElementById('entry-logout').addEventListener('click', () => {
+  isLoggedInInspector = false;
+  showPage('page-landing');
+});
+
+document.getElementById('entry-check-scores').addEventListener('click', () => {
+  showPage('page-viewer');
+  loadDaily();
+  loadWeekly();
+});
 
 document.getElementById('pw-submit').addEventListener('click', async () => {
   const cur = document.getElementById('pw-current').value;
@@ -347,6 +380,22 @@ function buildGradeOptions() {
   const sel = document.getElementById('grade');
   sel.innerHTML = GRADES.map(g => `<option value="${g}">${g}</option>`).join('');
 }
+
+function updateTeacherHint() {
+  const grade = document.getElementById('grade').value;
+  const room = document.getElementById('room').value;
+  const code = `${grade}/${room}`;
+  const names = teacherNamesFor(code);
+  const el = document.getElementById('teacher-hint');
+  if (names) {
+    el.textContent = `👩‍🏫 ครูประจำชั้น ${code}: ${names}`;
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+document.getElementById('grade').addEventListener('change', updateTeacherHint);
+document.getElementById('room').addEventListener('change', updateTeacherHint);
 
 function buildCriteria() {
   const container = document.getElementById('criteria-container');
@@ -663,9 +712,12 @@ async function loadDaily() {
     const recs = byRoom[code];
     const avg = recs ? Math.round(recs.reduce((a,b)=>a+b.total,0) / recs.length) : null;
     const color = avg === null ? '#6c7f8e' : scoreColor(avg);
+    const hlClass = avg === null ? '' : 'hl-' + classifyLevel(avg).cls;
+    const teacher = teacherNamesFor(code);
     return `
-      <div class="room-chip ${recs ? 'clickable' : ''}" data-code="${code}">
+      <div class="room-chip ${recs ? 'clickable' : ''} ${hlClass}" data-code="${code}">
         <div class="rname">${code}</div>
+        ${teacher ? `<div class="rteacher">${teacher}</div>` : ''}
         <div class="rscore" style="color:${color}">${avg === null ? '-' : avg}</div>
         <div class="rdate">${avg === null ? 'ไม่มีการตรวจ' : (recs.length > 1 ? recs.length + ' ครั้ง' : '1 ครั้ง')}</div>
         ${recs ? '<div class="rhint">แตะดูรายละเอียด</div>' : ''}
@@ -759,6 +811,11 @@ function renderWeekly(weekKey) {
   });
   rows.forEach(r => { if (r.avg !== null) counts[classifyLevel(r.avg).cls]++; });
 
+  const ranked = rows.filter(r => r.avg !== null).slice().sort((a, b) => b.avg - a.avg);
+  const rankMap = {};
+  ranked.slice(0, 3).forEach((r, idx) => { rankMap[r.code] = idx + 1; });
+  const rankMedal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
   legendEl.innerHTML = `
     <div class="legend-item"><div class="lcount" style="color:#1a8f4c;">${counts.excellent}</div><div>ผ่านเกณฑ์ดีเยี่ยม</div></div>
     <div class="legend-item"><div class="lcount" style="color:#1479c9;">${counts.pass}</div><div>ผ่านเกณฑ์</div></div>
@@ -769,17 +826,20 @@ function renderWeekly(weekKey) {
   tableEl.innerHTML = `
     <div class="table-scroll">
     <table>
-      <thead><tr><th>ห้อง</th><th>จำนวนครั้งที่ตรวจ</th><th>คะแนนเฉลี่ย</th><th>ระดับ</th></tr></thead>
+      <thead><tr><th>ห้อง</th><th>ครูประจำชั้น</th><th>จำนวนครั้งที่ตรวจ</th><th>คะแนนเฉลี่ย</th><th>ระดับ</th></tr></thead>
       <tbody>
         ${rows.map(r => {
-          if (r.avg === null) return `<tr><td>${r.code}</td><td>-</td><td>-</td><td style="color:var(--text-muted);">ไม่มีข้อมูล</td></tr>`;
+          const teacher = teacherNamesFor(r.code);
+          if (r.avg === null) return `<tr><td>${r.code}</td><td class="teacher-col">${teacher}</td><td>-</td><td>-</td><td style="color:var(--text-muted);">ไม่มีข้อมูล</td></tr>`;
           const lvl = classifyLevel(r.avg);
+          const rank = rankMap[r.code];
           return `
             <tr class="clickable-row" data-code="${r.code}">
               <td>${r.code}</td>
+              <td class="teacher-col">${teacher}</td>
               <td>${r.count}</td>
               <td class="score-cell">${r.avg}</td>
-              <td><span class="badge ${lvl.cls}">${lvl.label}</span></td>
+              <td><span class="badge ${lvl.cls}">${lvl.label}</span>${rank ? `<span class="rank-badge r${rank}">${rankMedal[rank]} อันดับ ${rank}</span>` : ''}</td>
             </tr>
           `;
         }).join('')}
@@ -807,4 +867,5 @@ buildCriteria();
 document.getElementById('date').value = new Date().toISOString().slice(0,10);
 document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
 updateScore();
+updateTeacherHint();
 showPage('page-landing');
