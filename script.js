@@ -16,6 +16,16 @@ const GRADES = ['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
 const ROOM_CODES = [];
 GRADES.forEach(g => { ROOM_CODES.push(`${g}/1`); ROOM_CODES.push(`${g}/2`); });
 
+const GRADE_GROUPS = [
+  { label: 'มัธยมศึกษาตอนต้น (ม.1 - ม.3)', grades: ['ม.1', 'ม.2', 'ม.3'] },
+  { label: 'มัธยมศึกษาตอนปลาย (ม.4 - ม.6)', grades: ['ม.4', 'ม.5', 'ม.6'] }
+];
+function roomCodesForGroup(group) {
+  const codes = [];
+  group.grades.forEach(g => { codes.push(`${g}/1`); codes.push(`${g}/2`); });
+  return codes;
+}
+
 const TEACHERS = {
   'ม.1/1': ['อ.กุลวลี', 'อ.เจนจิรา'],
   'ม.1/2': ['อ.เดือนเพ็ญ'],
@@ -178,6 +188,29 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
 
 function scoreColor(total) {
   return total < 0 ? '#d64545' : total < 60 ? '#b17600' : '#1479c9';
+}
+
+// รวมคะแนนที่ถูกหักแยกตามหัวข้อ จากหลายการตรวจ (ใช้สรุปปัญหารายสัปดาห์)
+function summarizeDeductions(recs) {
+  const totals = {};
+  CRITERIA.forEach(c => { totals[c.key] = 0; });
+  let severityTotal = 0;
+  recs.forEach(r => {
+    CRITERIA.forEach(c => {
+      const lvl = r.selections && r.selections[c.key];
+      if (lvl) totals[c.key] += c.pts[lvl - 1];
+    });
+    if (r.severity) {
+      const sev = SEVERITY.find(s => s.value === r.severity.level);
+      if (sev) severityTotal += sev.pts;
+    }
+  });
+  const items = CRITERIA
+    .map(c => ({ icon: c.icon, label: c.label, total: totals[c.key] }))
+    .filter(x => x.total > 0);
+  if (severityTotal > 0) items.push({ icon: '⚠️', label: 'กรณีพิเศษ', total: severityTotal });
+  items.sort((a, b) => b.total - a.total);
+  return items;
 }
 
 // สร้างแถวรายละเอียดคะแนนที่ถูกหักของ 1 การตรวจ (ใช้ทั้งตอนยืนยันบันทึก และตอนดูย้อนหลัง)
@@ -378,7 +411,11 @@ document.querySelectorAll('.subtab[data-etab]').forEach(tab => {
 // ==========================================================================
 function buildGradeOptions() {
   const sel = document.getElementById('grade');
-  sel.innerHTML = GRADES.map(g => `<option value="${g}">${g}</option>`).join('');
+  sel.innerHTML = GRADE_GROUPS.map(group => `
+    <optgroup label="${group.label}">
+      ${group.grades.map(g => `<option value="${g}">${g}</option>`).join('')}
+    </optgroup>
+  `).join('');
 }
 
 function updateTeacherHint() {
@@ -708,7 +745,7 @@ async function loadDaily() {
     if (!byRoom[code]) byRoom[code] = [];
     byRoom[code].push(r);
   });
-  container.innerHTML = `<div class="summary-grid">` + ROOM_CODES.map(code => {
+  function renderChip(code) {
     const recs = byRoom[code];
     const avg = recs ? Math.round(recs.reduce((a,b)=>a+b.total,0) / recs.length) : null;
     const color = avg === null ? '#6c7f8e' : scoreColor(avg);
@@ -723,7 +760,14 @@ async function loadDaily() {
         ${recs ? '<div class="rhint">แตะดูรายละเอียด</div>' : ''}
       </div>
     `;
-  }).join('') + `</div>`;
+  }
+
+  container.innerHTML = GRADE_GROUPS.map(group => `
+    <div class="grade-group">
+      <div class="grade-group-title">${group.label}</div>
+      <div class="summary-grid">${roomCodesForGroup(group).map(renderChip).join('')}</div>
+    </div>
+  `).join('');
 
   container.querySelectorAll('.room-chip.clickable').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -796,9 +840,12 @@ document.getElementById('week-select').addEventListener('change', (e) => renderW
 function renderWeekly(weekKey) {
   const legendEl = document.getElementById('weekly-legend');
   const tableEl = document.getElementById('weekly-table-container');
+  const issuesContainer = document.getElementById('weekly-issues-container');
+  const issuesList = document.getElementById('weekly-issues-list');
   if (!weekKey || !weeklyGroupsCache[weekKey]) {
     legendEl.innerHTML = '';
     tableEl.innerHTML = '<div class="empty">ยังไม่มีข้อมูลการตรวจในสัปดาห์นี้</div>';
+    issuesContainer.style.display = 'none';
     return;
   }
   const group = weeklyGroupsCache[weekKey];
@@ -856,6 +903,37 @@ function renderWeekly(weekKey) {
       showRecordDetailByDate(`รายละเอียดคะแนน ห้อง ${code}`, r.recs);
     });
   });
+
+  // สรุปหัวข้อที่ถูกหักคะแนนของแต่ละห้อง (รวมทั้งสัปดาห์)
+  const issueRooms = rows
+    .filter(r => r.recs && r.recs.length)
+    .map(r => ({ code: r.code, items: summarizeDeductions(r.recs) }))
+    .filter(r => r.items.length > 0)
+    .sort((a, b) => {
+      const sumA = a.items.reduce((s, i) => s + i.total, 0);
+      const sumB = b.items.reduce((s, i) => s + i.total, 0);
+      return sumB - sumA;
+    });
+
+  if (issueRooms.length) {
+    issuesContainer.style.display = 'block';
+    issuesList.innerHTML = issueRooms.map(r => {
+      const teacher = teacherNamesFor(r.code);
+      return `
+        <div class="issue-room-block">
+          <div class="issue-room-head">
+            <span class="issue-room-name">${r.code}</span>
+            ${teacher ? `<span class="issue-room-teacher">${teacher}</span>` : ''}
+          </div>
+          <div class="issue-tags">
+            ${r.items.map(i => `<span class="issue-tag">${i.icon} ${i.label} <b>-${i.total}</b></span>`).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    issuesContainer.style.display = 'none';
+  }
 }
 
 // ==========================================================================

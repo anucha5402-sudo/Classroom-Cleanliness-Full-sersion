@@ -227,6 +227,25 @@ tbody tr:hover { background: var(--sky-light); }
 .empty { text-align: center; color: var(--text-muted); font-size: 13.5px; padding: 34px 0; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
+
+.grade-group { margin-bottom: 22px; }
+.grade-group:last-child { margin-bottom: 0; }
+.grade-group-title {
+  font-size: 13.5px; font-weight: 700; color: var(--primary-dark); margin-bottom: 10px;
+  padding-bottom: 6px; border-bottom: 1.5px solid var(--border);
+}
+
+.issue-room-block { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.issue-room-block:last-child { border-bottom: none; }
+.issue-room-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.issue-room-name { font-weight: 700; font-size: 14px; color: var(--text); }
+.issue-room-teacher { font-size: 12px; color: var(--text-muted); }
+.issue-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.issue-tag {
+  font-size: 12px; padding: 5px 10px; border-radius: 999px; background: var(--danger-light);
+  color: #9c3a3a; display: inline-flex; align-items: center; gap: 4px;
+}
+.issue-tag b { color: var(--danger); }
 .room-chip {
   border: 1.5px solid var(--border); border-radius: 12px; padding: 12px; text-align: center;
   transition: transform 0.15s, box-shadow 0.15s; background: #fff;
