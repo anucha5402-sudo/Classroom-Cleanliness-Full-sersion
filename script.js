@@ -320,21 +320,30 @@ document.getElementById('login-cancel').addEventListener('click', () => showPage
 document.getElementById('btn-donate').addEventListener('click', () => {
   const html = `
     <button class="modal-close-x" onclick="closeModal()">✕</button>
-    <div style="text-align:center;">
-      <div style="font-size:32px;">🍪💙</div>
-      <h2 style="margin-top:6px;">บริจาคค่าขนมให้สภานักเรียน</h2>
-      <p class="modal-sub" style="max-width:320px; margin-left:auto; margin-right:auto;">
-        ทุกบาทที่ร่วมบริจาค ช่วยให้สภานักเรียนดูแลความสะอาดและซ่อมแซมอุปกรณ์ในห้องเรียนให้เพื่อนๆ ได้ดียิ่งขึ้นนะ ขอบคุณมากๆ เลย 🙏✨
-      </p>
-      <img src="assets/logo-krungthai.png" alt="ธนาคารกรุงไทย" style="width:52px; margin: 6px 0 10px;">
-      <img src="assets/donate-qr.png" alt="QR Code รับบริจาค" style="width:100%; max-width:240px; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,0.12);">
+    <div class="donate-hero">
+      <div class="donate-emoji">🍪</div>
+      <h2 class="donate-title">บริจาคค่าขนมให้สภานักเรียน</h2>
+      <p class="donate-msg">ทุกบาทที่ร่วมบริจาค ช่วยให้สภานักเรียนดูแลความสะอาดและซ่อมแซมอุปกรณ์ในห้องเรียนให้เพื่อนๆ ได้นะ 💙</p>
     </div>
+
+    <div class="donate-qr-card">
+      <img src="assets/donate-qr.png" alt="QR Code รับบริจาค" class="donate-qr-img">
+    </div>
+
+    <div class="donate-dua">
+      <div class="donate-dua-arabic">بَارَكَ اللهُ لَكَ فِي أَهْلِكَ وَمَالِكَ</div>
+      <div class="donate-dua-translate">(ขออัลลอฮ์ทรงประทานความบารากะฮ์ (ความจำเริญ) ให้แก่ครอบครัวและทรัพย์สินของท่าน)</div>
+    </div>
+
     <div class="donate-info">
-      <div class="donate-info-row"><span>ธนาคาร</span><b>กรุงไทย</b></div>
+      <div class="donate-info-row">
+        <span><img src="assets/logo-krungthai.png" class="donate-bank-icon" alt="กรุงไทย">ธนาคาร</span>
+        <b>กรุงไทย</b>
+      </div>
       <div class="donate-info-row"><span>เลขบัญชี</span><b>663-2-43414-2</b></div>
       <div class="donate-info-row"><span>ชื่อบัญชี</span><b>เงินบริจาคเพื่อโรงเรียนดารุสสลามวิทยา</b></div>
     </div>
-    <button class="ghost" id="copy-acc-btn" style="width:100%; margin-top:12px;">📋 คัดลอกเลขบัญชี</button>
+    <button class="primary donate-copy-btn" id="copy-acc-btn" style="width:100%; margin-top:12px;">📋 คัดลอกเลขบัญชี</button>
   `;
   openModal(html);
   document.getElementById('copy-acc-btn').addEventListener('click', () => {

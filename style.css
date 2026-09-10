@@ -305,8 +305,50 @@ tbody tr:hover { background: var(--sky-light); }
   padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border);
 }
 .donate-info-row:last-child { border-bottom: none; }
-.donate-info-row span { color: var(--text-muted); }
+.donate-info-row span { color: var(--text-muted); display: flex; align-items: center; }
 .donate-info-row b { color: var(--text); font-weight: 700; }
+.donate-bank-icon { width: 16px; height: 16px; vertical-align: middle; margin-right: 6px; border-radius: 3px; object-fit: contain; }
+
+.donate-hero { text-align: center; padding: 2px 4px 12px; }
+.donate-emoji { font-size: 44px; display: inline-block; animation: wiggle 1.6s ease-in-out infinite; }
+@keyframes wiggle { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+.donate-title {
+  font-size: 19px; font-weight: 800; margin: 8px 0 6px;
+  background: linear-gradient(135deg, #ff9d3d, #ff6b6b);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.donate-msg { font-size: 13px; color: var(--text-muted); max-width: 300px; margin: 0 auto; line-height: 1.55; }
+
+.donate-qr-card {
+  background: #fff; border-radius: 20px; padding: 18px 16px 16px; margin: 18px auto 16px;
+  max-width: 230px; position: relative;
+  border: 1px solid #ffe3c2; box-shadow: 0 12px 30px rgba(255, 130, 40, 0.18);
+  animation: qrPop 0.3s ease;
+}
+@keyframes qrPop { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+.donate-qr-card::before {
+  content: '📷 สแกนเลย'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff9d3d, #ff6b6b); color: #fff; font-size: 11px; font-weight: 700;
+  padding: 4px 14px; border-radius: 999px; box-shadow: 0 3px 10px rgba(255, 100, 40, 0.35); white-space: nowrap;
+}
+.donate-qr-img { width: 100%; display: block; border-radius: 10px; }
+
+.donate-dua {
+  text-align: center; margin: 6px 0 16px; padding: 16px 14px;
+  background: linear-gradient(135deg, #fff8ef, #fff1e0);
+  border-radius: 16px; border: 1.5px dashed #ffcf9e;
+}
+.donate-dua-arabic {
+  font-family: 'Amiri', 'Traditional Arabic', serif; font-size: 21px; font-weight: 700;
+  color: #8a5a1f; direction: rtl; line-height: 2;
+}
+.donate-dua-translate { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+
+.donate-copy-btn {
+  background: linear-gradient(135deg, #ff9d3d, #ff6b6b) !important;
+  box-shadow: 0 4px 14px rgba(255, 120, 60, 0.32) !important;
+}
+.donate-copy-btn:hover { box-shadow: 0 6px 18px rgba(255, 120, 60, 0.42) !important; }
 
 .subtabs { display: flex; gap: 4px; margin-bottom: 16px; background: rgba(255,255,255,0.7); border: 1px solid var(--border); border-radius: 999px; padding: 4px; width: fit-content; max-width: 100%; overflow-x: auto; }
 .subtab { padding: 9px 18px; font-size: 13.5px; cursor: pointer; border: none; background: none; color: var(--text-muted); border-radius: 999px; font-family: inherit; transition: all 0.2s; white-space: nowrap; }
