@@ -289,6 +289,25 @@ tbody tr:hover { background: var(--sky-light); }
 .big-btn.enter:hover { box-shadow: 0 8px 24px rgba(20,121,201,0.4); }
 .login-card { max-width: 360px; margin: 30px auto 0; }
 
+.donate-btn {
+  font-family: inherit; font-size: 14px; font-weight: 700; color: #b8460e;
+  background: linear-gradient(135deg, #ffe1c4, #ffcf9e);
+  border: none; border-radius: 999px; padding: 12px 22px; margin-top: 22px;
+  cursor: pointer; box-shadow: 0 4px 14px rgba(255, 152, 0, 0.22);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.donate-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 6px 18px rgba(255, 152, 0, 0.32); }
+.donate-btn:active { transform: translateY(0) scale(0.99); }
+
+.donate-info { border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 14px; }
+.donate-info-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border);
+}
+.donate-info-row:last-child { border-bottom: none; }
+.donate-info-row span { color: var(--text-muted); }
+.donate-info-row b { color: var(--text); font-weight: 700; }
+
 .subtabs { display: flex; gap: 4px; margin-bottom: 16px; background: rgba(255,255,255,0.7); border: 1px solid var(--border); border-radius: 999px; padding: 4px; width: fit-content; max-width: 100%; overflow-x: auto; }
 .subtab { padding: 9px 18px; font-size: 13.5px; cursor: pointer; border: none; background: none; color: var(--text-muted); border-radius: 999px; font-family: inherit; transition: all 0.2s; white-space: nowrap; }
 .subtab:hover { color: var(--primary); }

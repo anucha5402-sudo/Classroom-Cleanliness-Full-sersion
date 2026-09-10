@@ -317,6 +317,37 @@ document.getElementById('btn-go-login').addEventListener('click', () => {
 });
 document.getElementById('login-cancel').addEventListener('click', () => showPage('page-landing'));
 
+document.getElementById('btn-donate').addEventListener('click', () => {
+  const html = `
+    <button class="modal-close-x" onclick="closeModal()">✕</button>
+    <div style="text-align:center;">
+      <div style="font-size:32px;">🍪💙</div>
+      <h2 style="margin-top:6px;">บริจาคค่าขนมให้สภานักเรียน</h2>
+      <p class="modal-sub" style="max-width:320px; margin-left:auto; margin-right:auto;">
+        ทุกบาทที่ร่วมบริจาค ช่วยให้สภานักเรียนดูแลความสะอาดและซ่อมแซมอุปกรณ์ในห้องเรียนให้เพื่อนๆ ได้ดียิ่งขึ้นนะ ขอบคุณมากๆ เลย 🙏✨
+      </p>
+      <img src="assets/logo-krungthai.png" alt="ธนาคารกรุงไทย" style="width:52px; margin: 6px 0 10px;">
+      <img src="assets/donate-qr.png" alt="QR Code รับบริจาค" style="width:100%; max-width:240px; border-radius:14px; box-shadow:0 4px 14px rgba(0,0,0,0.12);">
+    </div>
+    <div class="donate-info">
+      <div class="donate-info-row"><span>ธนาคาร</span><b>กรุงไทย</b></div>
+      <div class="donate-info-row"><span>เลขบัญชี</span><b>663-2-43414-2</b></div>
+      <div class="donate-info-row"><span>ชื่อบัญชี</span><b>เงินบริจาคเพื่อโรงเรียนดารุสสลามวิทยา</b></div>
+    </div>
+    <button class="ghost" id="copy-acc-btn" style="width:100%; margin-top:12px;">📋 คัดลอกเลขบัญชี</button>
+  `;
+  openModal(html);
+  document.getElementById('copy-acc-btn').addEventListener('click', () => {
+    const btn = document.getElementById('copy-acc-btn');
+    navigator.clipboard.writeText('663-2-43414-2').then(() => {
+      btn.textContent = '✅ คัดลอกเลขบัญชีแล้ว';
+      setTimeout(() => { btn.textContent = '📋 คัดลอกเลขบัญชี'; }, 2000);
+    }).catch(() => {
+      btn.textContent = 'คัดลอกไม่สำเร็จ ลองคัดลอกด้วยตัวเองนะ';
+    });
+  });
+});
+
 document.querySelectorAll('.pw-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.target);
