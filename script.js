@@ -977,6 +977,19 @@ function renderWeekly(weekKey) {
   }
 }
 
+function updateHeroDate() {
+  const el = document.getElementById('hero-date');
+  if (!el) return;
+  try {
+    const formatter = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+    el.textContent = '📅 ' + formatter.format(new Date());
+  } catch (e) {
+    el.textContent = '';
+  }
+}
+
 // ==========================================================================
 // เริ่มต้นแอป
 // ==========================================================================
@@ -987,4 +1000,5 @@ document.getElementById('date').value = new Date().toISOString().slice(0,10);
 document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
 updateScore();
 updateTeacherHint();
+updateHeroDate();
 showPage('page-landing');

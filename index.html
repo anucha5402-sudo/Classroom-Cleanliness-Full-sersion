@@ -19,20 +19,49 @@
 <div class="app">
 
   <div id="page-landing" class="landing">
-    <div class="brand-header">
-      <img class="logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
-      <div class="brand-text">
-        <div class="school-name">โรงเรียนดารุสสลามวิทยา</div>
-        <div class="app-name">ระบบให้คะแนนความสะอาดห้องเรียน</div>
+    <div class="hero-card">
+      <div class="hero-decor hd1"></div>
+      <div class="hero-decor hd2"></div>
+      <img class="hero-logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
+      <div class="hero-school-name">โรงเรียนดารุสสลามวิทยา</div>
+      <div class="hero-app-name">ระบบให้คะแนนความสะอาดห้องเรียน</div>
+      <div class="hero-meta">
+        <span class="hero-chip">🏫 ม.1 - ม.6</span>
+        <span class="hero-chip">🚪 12 ห้องเรียน</span>
       </div>
+      <div class="hero-date" id="hero-date"></div>
     </div>
-    <p class="subtitle">ม.1 - ม.6 ห้อง /1 และ /2</p>
-    <div id="conn-badge-landing" style="margin-bottom: 10px;"></div>
-    <div class="landing-buttons">
-      <button class="big-btn view" id="btn-go-viewer">📊 ดูภาพรวมคะแนน</button>
-      <button class="big-btn enter" id="btn-go-login">🔐 เข้าสู่ระบบผู้ตรวจ</button>
+
+    <div id="conn-badge-landing" class="conn-badge-wrap"></div>
+
+    <div class="action-list">
+      <button class="action-card action-blue" id="btn-go-viewer">
+        <div class="action-icon">📊</div>
+        <div class="action-text">
+          <div class="action-title">ดูภาพรวมคะแนน</div>
+          <div class="action-desc">เช็คคะแนนความสะอาดแต่ละห้อง ไม่ต้องล็อกอิน</div>
+        </div>
+        <div class="action-arrow">›</div>
+      </button>
+
+      <button class="action-card action-primary" id="btn-go-login">
+        <div class="action-icon">🔐</div>
+        <div class="action-text">
+          <div class="action-title">เข้าสู่ระบบผู้ตรวจ</div>
+          <div class="action-desc">สำหรับผู้มีสิทธิ์กรอกคะแนนประจำวัน</div>
+        </div>
+        <div class="action-arrow">›</div>
+      </button>
+
+      <button class="action-card action-donate" id="btn-donate">
+        <div class="action-icon">🍪</div>
+        <div class="action-text">
+          <div class="action-title">บริจาคค่าขนมให้สภานักเรียน</div>
+          <div class="action-desc">ร่วมสนับสนุนกิจกรรมของโรงเรียน</div>
+        </div>
+        <div class="action-arrow">›</div>
+      </button>
     </div>
-    <button class="donate-btn" id="btn-donate">🍪 บริจาคค่าขนมให้สภานักเรียน</button>
   </div>
 
   <div id="page-login" style="display:none;">
