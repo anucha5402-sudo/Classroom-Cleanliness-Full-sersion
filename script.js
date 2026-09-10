@@ -343,7 +343,8 @@ document.getElementById('btn-donate').addEventListener('click', () => {
       <div class="donate-info-row"><span>เลขบัญชี</span><b>663-2-43414-2</b></div>
       <div class="donate-info-row"><span>ชื่อบัญชี</span><b>เงินบริจาคเพื่อโรงเรียนดารุสสลามวิทยา</b></div>
     </div>
-    <button class="primary donate-copy-btn" id="copy-acc-btn" style="width:100%; margin-top:12px;">📋 คัดลอกเลขบัญชี</button>
+    <p class="donate-tax-note">💡 บริจาคผ่านระบบ e-Donation นี้ สามารถนำไปใช้ลดหย่อนภาษีได้ด้วยนะ</p>
+    <button class="primary donate-copy-btn" id="copy-acc-btn" style="width:100%; margin-top:4px;">📋 คัดลอกเลขบัญชี</button>
   `;
   openModal(html);
   document.getElementById('copy-acc-btn').addEventListener('click', () => {
