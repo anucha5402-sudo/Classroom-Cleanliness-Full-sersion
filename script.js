@@ -162,7 +162,9 @@ function updateHeroStatusLine(recordsForTime) {
   }
   if (lastKnownUpdateTime) {
     const d = new Date(lastKnownUpdateTime);
-    timeText = 'อัปเดตล่าสุด ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+    const dateText = d.toLocaleDateString('th-TH-u-ca-buddhist', { day: 'numeric', month: 'short' });
+    const timePart = d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    timeText = `อัปเดตล่าสุด วันที่ ${dateText} เวลา ${timePart} น.`;
   } else if (recordsForTime) {
     timeText = 'ยังไม่มีข้อมูล';
   }
