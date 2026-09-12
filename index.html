@@ -22,24 +22,22 @@
     <div class="hero-card">
       <div class="hero-decor hd1"></div>
       <div class="hero-decor hd2"></div>
-      <img class="hero-logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
-      <div class="hero-school-name">โรงเรียนดารุสสลามวิทยา</div>
-      <div class="hero-app-name">ระบบให้คะแนนความสะอาดห้องเรียน</div>
-      <div class="hero-meta">
-        <span class="hero-chip">🏫 ม.1 - ม.6</span>
-        <span class="hero-chip">🚪 12 ห้องเรียน</span>
+      <div class="hero-row">
+        <img class="hero-logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
+        <div class="hero-text">
+          <div class="hero-school-name">โรงเรียนดารุสสลามวิทยา</div>
+          <div class="hero-app-name">ระบบให้คะแนนความสะอาดห้องเรียน · ม.1-ม.6</div>
+        </div>
       </div>
-      <div class="hero-date" id="hero-date"></div>
+      <div class="hero-status-line" id="hero-status-line"></div>
     </div>
-
-    <div id="conn-badge-landing" class="conn-badge-wrap"></div>
 
     <div class="action-list">
       <button class="action-card action-blue" id="btn-go-viewer">
         <div class="action-icon">📊</div>
         <div class="action-text">
           <div class="action-title">ดูภาพรวมคะแนน</div>
-          <div class="action-desc">เช็คคะแนนความสะอาดแต่ละห้อง ไม่ต้องล็อกอิน</div>
+          <div class="action-desc">เช็คคะแนนแต่ละห้อง</div>
         </div>
         <div class="action-arrow">›</div>
       </button>
@@ -48,20 +46,18 @@
         <div class="action-icon">🔐</div>
         <div class="action-text">
           <div class="action-title">เข้าสู่ระบบผู้ตรวจ</div>
-          <div class="action-desc">สำหรับผู้มีสิทธิ์กรอกคะแนนประจำวัน</div>
-        </div>
-        <div class="action-arrow">›</div>
-      </button>
-
-      <button class="action-card action-donate" id="btn-donate">
-        <div class="action-icon">🍪</div>
-        <div class="action-text">
-          <div class="action-title">บริจาคค่าขนมให้สภานักเรียน</div>
-          <div class="action-desc">ร่วมสนับสนุนกิจกรรมของโรงเรียน</div>
+          <div class="action-desc">กรอกคะแนนประจำวัน</div>
         </div>
         <div class="action-arrow">›</div>
       </button>
     </div>
+
+    <div class="card summary-card" id="landing-summary-card" style="display:none;">
+      <div class="summary-card-title">🏆 อันดับห้องเรียนสัปดาห์นี้</div>
+      <div id="landing-rank-list"></div>
+    </div>
+
+    <button class="donate-link" id="btn-donate">🍪 บริจาคช่วยโรงเรียน</button>
   </div>
 
   <div id="page-login" style="display:none;">

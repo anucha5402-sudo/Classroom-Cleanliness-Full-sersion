@@ -140,10 +140,33 @@ function renderConnBadges() {
   const html = USE_FIREBASE
     ? `<span class="conn-badge online"><span class="conn-dot online"></span>เชื่อมต่อฐานข้อมูลกลาง</span>`
     : `<span class="conn-badge offline"><span class="conn-dot"></span>โหมดออฟไลน์ (เก็บเฉพาะเครื่องนี้)</span>`;
-  ['conn-badge-landing', 'conn-badge-viewer', 'conn-badge-entry'].forEach(id => {
+  ['conn-badge-viewer', 'conn-badge-entry'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = html;
   });
+  updateHeroStatusLine();
+}
+
+let lastKnownUpdateTime = null;
+
+function updateHeroStatusLine(recordsForTime) {
+  const el = document.getElementById('hero-status-line');
+  if (!el) return;
+  const statusHtml = USE_FIREBASE
+    ? `<span><span class="hs-dot"></span>ระบบออนไลน์</span>`
+    : `<span><span class="hs-dot offline"></span>โหมดออฟไลน์</span>`;
+  let timeText = 'กำลังโหลด...';
+  if (recordsForTime) {
+    const latest = recordsForTime.reduce((max, r) => Math.max(max, r.savedAt || 0), 0);
+    lastKnownUpdateTime = latest || null;
+  }
+  if (lastKnownUpdateTime) {
+    const d = new Date(lastKnownUpdateTime);
+    timeText = 'อัปเดตล่าสุด ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+  } else if (recordsForTime) {
+    timeText = 'ยังไม่มีข้อมูล';
+  }
+  el.innerHTML = `${statusHtml}<span>${timeText}</span>`;
 }
 
 // ==========================================================================
@@ -158,6 +181,7 @@ function showPage(id) {
   ['page-landing','page-login','page-viewer','page-entry'].forEach(p => {
     document.getElementById(p).style.display = (p === id) ? 'block' : 'none';
   });
+  if (id === 'page-landing') loadLandingSummary();
 }
 
 function animateNumber(el, from, to, duration) {
@@ -263,29 +287,33 @@ function buildRecordBlockHtml(record) {
   `;
 }
 
-function showRecordListModal(title, subtitle, records) {
-  const html = `
-    <button class="modal-close-x" onclick="closeModal()">✕</button>
-    <h2>${title}</h2>
-    <div class="modal-sub">${subtitle}</div>
-    ${records.map(buildRecordBlockHtml).join('')}
-  `;
-  openModal(html);
-}
+// โมดัลรายละเอียดห้อง: กราฟคะแนนย้อนหลังทั้งหมด + เลือกวันที่ดูรายละเอียดการหักคะแนน
+async function openRoomDetailModal(code, contextRecords, contextLabel) {
+  openModal(`<div class="empty">กำลังโหลด...</div>`);
+  const allRecords = await loadAllRecords();
+  const roomHistory = allRecords
+    .filter(r => `${r.grade}/${r.room}` === code)
+    .sort((a, b) => a.savedAt - b.savedAt);
 
-// โมดัลดูรายละเอียดแบบเลือกวันที่ (ใช้กับค่าเฉลี่ยรายสัปดาห์ ที่อาจมีหลายวันในสัปดาห์เดียว)
-function showRecordDetailByDate(title, records) {
   const byDate = {};
-  records.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+  contextRecords.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
   const dates = Object.keys(byDate).sort().reverse();
   let selectedDate = dates[0];
+  const teacher = teacherNamesFor(code);
 
   function render() {
     const pills = dates.map(d => `<button type="button" class="date-pill ${d === selectedDate ? 'active' : ''}" data-date="${d}">${d}</button>`).join('');
     const recs = byDate[selectedDate];
     const html = `
       <button class="modal-close-x" onclick="closeModal()">✕</button>
-      <h2>${title}</h2>
+      <h2>ห้อง ${code}</h2>
+      <div class="modal-sub">${teacher ? 'ครูประจำชั้น: ' + teacher + ' &middot; ' : ''}${contextLabel}</div>
+      ${roomHistory.length >= 2 ? `
+        <div class="chart-wrap">
+          <div class="chart-title">แนวโน้มคะแนนย้อนหลัง (${roomHistory.length} ครั้ง)</div>
+          <canvas id="room-trend-chart" height="140"></canvas>
+        </div>
+      ` : ''}
       <div class="date-pill-row">${pills}</div>
       ${recs.map(buildRecordBlockHtml).join('')}
     `;
@@ -293,8 +321,90 @@ function showRecordDetailByDate(title, records) {
     document.querySelectorAll('.date-pill').forEach(p => {
       p.addEventListener('click', () => { selectedDate = p.dataset.date; render(); });
     });
+    if (roomHistory.length >= 2) {
+      const canvas = document.getElementById('room-trend-chart');
+      if (canvas) drawScoreChart(canvas, roomHistory);
+    }
   }
   render();
+}
+
+function drawScoreChart(canvas, records) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = canvas.parentElement.clientWidth;
+  const cssHeight = 140;
+  canvas.style.width = cssWidth + 'px';
+  canvas.style.height = cssHeight + 'px';
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+  const padL = 30, padR = 10, padT = 10, padB = 20;
+  const plotW = cssWidth - padL - padR;
+  const plotH = cssHeight - padT - padB;
+
+  const totals = records.map(r => r.total);
+  const dataMin = Math.min(0, ...totals);
+  const min = Math.floor((dataMin - 5) / 10) * 10;
+  const max = 100;
+  const range = max - min;
+
+  const xFor = (i) => padL + (records.length === 1 ? plotW / 2 : (i / (records.length - 1)) * plotW);
+  const yFor = (v) => padT + plotH - ((v - min) / range) * plotH;
+
+  ctx.strokeStyle = '#dfe9f2';
+  ctx.lineWidth = 1;
+  ctx.font = '10px Sarabun, sans-serif';
+  ctx.fillStyle = '#6c7f8e';
+  [min, max, 0].forEach(v => {
+    if (v < min || v > max) return;
+    const y = yFor(v);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+    ctx.fillText(String(v), 2, y + 3);
+  });
+
+  const gradient = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  gradient.addColorStop(0, 'rgba(20,121,201,0.22)');
+  gradient.addColorStop(1, 'rgba(20,121,201,0.02)');
+  ctx.beginPath();
+  records.forEach((r, i) => {
+    const x = xFor(i), y = yFor(r.total);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(xFor(records.length - 1), yFor(min));
+  ctx.lineTo(xFor(0), yFor(min));
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.strokeStyle = '#1479c9';
+  ctx.lineWidth = 2;
+  records.forEach((r, i) => {
+    const x = xFor(i), y = yFor(r.total);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  records.forEach((r, i) => {
+    const x = xFor(i), y = yFor(r.total);
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = scoreColor(r.total);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#6c7f8e';
+  const fmt = (d) => { const [y,m,day] = d.split('-'); return `${day}/${m}`; };
+  ctx.fillText(fmt(records[0].date), padL, cssHeight - 4);
+  ctx.textAlign = 'right';
+  ctx.fillText(fmt(records[records.length - 1].date), padL + plotW, cssHeight - 4);
+  ctx.textAlign = 'left';
 }
 
 // ==========================================================================
@@ -731,6 +841,51 @@ async function loadAllRecords() {
   }
 }
 
+async function loadLandingSummary() {
+  const card = document.getElementById('landing-summary-card');
+  const listEl = document.getElementById('landing-rank-list');
+  const records = await loadAllRecords();
+  updateHeroStatusLine(records);
+
+  if (!records.length) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const todayKey = getISOWeekInfo(new Date().toISOString().slice(0, 10)).key;
+  const roomTotals = {};
+  records.forEach(r => {
+    if (getISOWeekInfo(r.date).key !== todayKey) return;
+    const code = `${r.grade}/${r.room}`;
+    if (!roomTotals[code]) roomTotals[code] = [];
+    roomTotals[code].push(r.total);
+  });
+  const ranked = Object.keys(roomTotals)
+    .map(code => ({ code, avg: Math.round(roomTotals[code].reduce((a,b)=>a+b,0) / roomTotals[code].length) }))
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 3);
+
+  if (!ranked.length) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const medals = ['🥇', '🥈', '🥉'];
+  card.style.display = 'block';
+  listEl.innerHTML = ranked.map((r, i) => `
+    <div class="rank-row">
+      <div class="rr-left">
+        <span class="rr-medal">${medals[i]}</span>
+        <div>
+          <div class="rr-room">${r.code}</div>
+          <div class="rr-teacher">${teacherNamesFor(r.code)}</div>
+        </div>
+      </div>
+      <div class="rr-score" style="color:${scoreColor(r.avg)}">${r.avg}</div>
+    </div>
+  `).join('');
+}
+
 async function loadHistory() {
   const container = document.getElementById('history-container');
   container.innerHTML = '<div class="empty">กำลังโหลด...</div>';
@@ -814,11 +969,7 @@ async function loadDaily() {
     chip.addEventListener('click', () => {
       const code = chip.dataset.code;
       const recs = byRoom[code];
-      showRecordListModal(
-        `รายละเอียดคะแนน ห้อง ${code}`,
-        `วันที่ ${targetDate} &middot; ตรวจทั้งหมด ${recs.length} ครั้ง`,
-        recs
-      );
+      openRoomDetailModal(code, recs, `วันที่ ${targetDate} &middot; ตรวจทั้งหมด ${recs.length} ครั้ง`);
     });
   });
 }
@@ -941,7 +1092,7 @@ function renderWeekly(weekKey) {
       const code = row.dataset.code;
       const r = rows.find(x => x.code === code);
       if (!r || !r.recs) return;
-      showRecordDetailByDate(`รายละเอียดคะแนน ห้อง ${code}`, r.recs);
+      openRoomDetailModal(code, r.recs, `${group.label} &middot; ตรวจทั้งหมด ${r.recs.length} ครั้ง`);
     });
   });
 
@@ -977,19 +1128,6 @@ function renderWeekly(weekKey) {
   }
 }
 
-function updateHeroDate() {
-  const el = document.getElementById('hero-date');
-  if (!el) return;
-  try {
-    const formatter = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-    });
-    el.textContent = '📅 ' + formatter.format(new Date());
-  } catch (e) {
-    el.textContent = '';
-  }
-}
-
 // ==========================================================================
 // เริ่มต้นแอป
 // ==========================================================================
@@ -1000,5 +1138,4 @@ document.getElementById('date').value = new Date().toISOString().slice(0,10);
 document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
 updateScore();
 updateTeacherHint();
-updateHeroDate();
 showPage('page-landing');
