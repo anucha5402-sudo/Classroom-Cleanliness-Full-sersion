@@ -439,6 +439,36 @@ tbody tr:hover { background: var(--sky-light); }
 .chart-title { font-size: 11.5px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
 .chart-wrap canvas { width: 100%; display: block; }
 
+.row-hint { font-size: 10px; color: var(--sky); margin-top: 1px; }
+
+.modal-subtabs { display: flex; gap: 4px; background: var(--bg); border-radius: 999px; padding: 4px; margin: 10px 0 14px; }
+.modal-subtab {
+  flex: 1; padding: 8px 10px; font-size: 12.5px; font-weight: 600; text-align: center;
+  border: none; background: none; border-radius: 999px; cursor: pointer; color: var(--text-muted);
+  font-family: inherit; transition: all 0.15s;
+}
+.modal-subtab.active { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 3px 8px rgba(20,121,201,0.3); }
+
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+.stat-box { background: var(--bg); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center; }
+.stat-box .sb-value { font-size: 20px; font-weight: 800; }
+.stat-box .sb-label { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+
+.trend-banner {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm);
+  margin-bottom: 14px; font-size: 13px; font-weight: 600;
+}
+.trend-banner.up { background: #e4f7ec; color: #1a8f4c; }
+.trend-banner.down { background: var(--danger-light); color: var(--danger); }
+.trend-banner.flat { background: var(--sky-light); color: var(--primary-dark); }
+.trend-banner .tb-icon { font-size: 22px; }
+
+.analysis-section-title { font-size: 12.5px; font-weight: 700; color: var(--text); margin: 4px 0 8px; }
+.recommend-box {
+  background: var(--accent-light); border: 1px dashed var(--accent); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: 12.5px; color: #7a5410; line-height: 1.5; margin-top: 4px;
+}
+
 .badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .badge.excellent { background: #e4f7ec; color: #1a8f4c; }
 .badge.pass { background: var(--primary-light); color: var(--primary-dark); }

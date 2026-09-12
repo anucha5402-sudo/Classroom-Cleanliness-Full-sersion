@@ -301,29 +301,88 @@ async function openRoomDetailModal(code, contextRecords, contextLabel) {
   contextRecords.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
   const dates = Object.keys(byDate).sort().reverse();
   let selectedDate = dates[0];
+  let activeTab = 'daily';
   const teacher = teacherNamesFor(code);
 
-  function render() {
+  function renderDailyTab() {
     const pills = dates.map(d => `<button type="button" class="date-pill ${d === selectedDate ? 'active' : ''}" data-date="${d}">${d}</button>`).join('');
     const recs = byDate[selectedDate];
+    return `
+      <div class="date-pill-row">${pills}</div>
+      ${recs.map(buildRecordBlockHtml).join('')}
+    `;
+  }
+
+  function renderAnalysisTab() {
+    if (roomHistory.length < 2) {
+      return `<div class="empty">ข้อมูลยังไม่พอสำหรับวิเคราะห์ (ต้องมีอย่างน้อย 2 ครั้ง)</div>`;
+    }
+    const totals = roomHistory.map(r => r.total);
+    const avgAll = Math.round(totals.reduce((a,b)=>a+b,0) / totals.length);
+    const maxScore = Math.max(...totals);
+    const minScore = Math.min(...totals);
+
+    const mid = Math.ceil(roomHistory.length / 2);
+    const firstHalf = totals.slice(0, mid);
+    const secondHalf = totals.slice(mid);
+    const firstAvg = firstHalf.reduce((a,b)=>a+b,0) / firstHalf.length;
+    const secondAvg = secondHalf.length ? secondHalf.reduce((a,b)=>a+b,0) / secondHalf.length : firstAvg;
+    const diff = Math.round(secondAvg - firstAvg);
+
+    let trendCls = 'flat', trendIcon = '➖', trendText = 'คะแนนค่อนข้างคงที่';
+    if (diff >= 4) { trendCls = 'up'; trendIcon = '📈'; trendText = `คะแนนมีแนวโน้มดีขึ้น (+${diff} คะแนนเทียบช่วงก่อนหน้า)`; }
+    else if (diff <= -4) { trendCls = 'down'; trendIcon = '📉'; trendText = `คะแนนมีแนวโน้มแย่ลง (${diff} คะแนนเทียบช่วงก่อนหน้า)`; }
+
+    const issues = summarizeDeductions(roomHistory).slice(0, 3);
+    const recommendText = issues.length
+      ? `ควรเน้นแก้ไขเรื่อง "${issues[0].label}" เป็นพิเศษ เพราะเป็นสาเหตุหลักที่ทำให้เสียคะแนนไป ${issues[0].total} คะแนนตลอดช่วงที่ผ่านมา`
+      : 'ห้องนี้ไม่มีปัญหาเด่นชัด รักษามาตรฐานนี้ไว้ต่อไปนะ 👏';
+
+    return `
+      <div class="chart-wrap">
+        <div class="chart-title">แนวโน้มคะแนนย้อนหลัง (${roomHistory.length} ครั้ง)</div>
+        <canvas id="room-trend-chart" height="140"></canvas>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="sb-value" style="color:${scoreColor(avgAll)}">${avgAll}</div><div class="sb-label">คะแนนเฉลี่ยทั้งหมด</div></div>
+        <div class="stat-box"><div class="sb-value" style="color:${scoreColor(maxScore)}">${maxScore}</div><div class="sb-label">คะแนนสูงสุด</div></div>
+        <div class="stat-box"><div class="sb-value" style="color:${scoreColor(minScore)}">${minScore}</div><div class="sb-label">คะแนนต่ำสุด</div></div>
+        <div class="stat-box"><div class="sb-value">${roomHistory.length}</div><div class="sb-label">จำนวนครั้งที่ตรวจ</div></div>
+      </div>
+      <div class="trend-banner ${trendCls}"><span class="tb-icon">${trendIcon}</span><span>${trendText}</span></div>
+      ${issues.length ? `
+        <div class="analysis-section-title">หัวข้อที่เป็นปัญหาบ่อยที่สุด</div>
+        <div class="issue-tags" style="margin-bottom:12px;">
+          ${issues.map(i => `<span class="issue-tag">${i.icon} ${i.label} <b>-${i.total}</b></span>`).join('')}
+        </div>
+      ` : ''}
+      <div class="analysis-section-title">คำแนะนำ</div>
+      <div class="recommend-box">💡 ${recommendText}</div>
+    `;
+  }
+
+  function render() {
     const html = `
       <button class="modal-close-x" onclick="closeModal()">✕</button>
       <h2>ห้อง ${code}</h2>
       <div class="modal-sub">${teacher ? 'ครูประจำชั้น: ' + teacher + ' &middot; ' : ''}${contextLabel}</div>
-      ${roomHistory.length >= 2 ? `
-        <div class="chart-wrap">
-          <div class="chart-title">แนวโน้มคะแนนย้อนหลัง (${roomHistory.length} ครั้ง)</div>
-          <canvas id="room-trend-chart" height="140"></canvas>
-        </div>
-      ` : ''}
-      <div class="date-pill-row">${pills}</div>
-      ${recs.map(buildRecordBlockHtml).join('')}
+      <div class="modal-subtabs">
+        <button class="modal-subtab ${activeTab === 'daily' ? 'active' : ''}" data-tab="daily">ดูคะแนนแต่ละวัน</button>
+        <button class="modal-subtab ${activeTab === 'analysis' ? 'active' : ''}" data-tab="analysis">บทวิเคราะห์</button>
+      </div>
+      ${activeTab === 'daily' ? renderDailyTab() : renderAnalysisTab()}
     `;
     openModal(html);
-    document.querySelectorAll('.date-pill').forEach(p => {
-      p.addEventListener('click', () => { selectedDate = p.dataset.date; render(); });
+
+    document.querySelectorAll('.modal-subtab').forEach(btn => {
+      btn.addEventListener('click', () => { activeTab = btn.dataset.tab; render(); });
     });
-    if (roomHistory.length >= 2) {
+
+    if (activeTab === 'daily') {
+      document.querySelectorAll('.date-pill').forEach(p => {
+        p.addEventListener('click', () => { selectedDate = p.dataset.date; render(); });
+      });
+    } else if (activeTab === 'analysis' && roomHistory.length >= 2) {
       const canvas = document.getElementById('room-trend-chart');
       if (canvas) drawScoreChart(canvas, roomHistory);
     }
@@ -935,8 +994,20 @@ async function loadDaily() {
   const targetDate = dateInput.value;
   const container = document.getElementById('daily-grid-container');
   container.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+
+  const dayOfWeek = new Date(targetDate + 'T00:00:00').getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    container.innerHTML = '<div class="empty">🎉 วันหยุดสุดสัปดาห์ ไม่มีการตรวจในวันนี้</div>';
+    return;
+  }
+
   const records = await loadAllRecords();
   const dayRecords = records.filter(r => r.date === targetDate);
+  if (!dayRecords.length) {
+    container.innerHTML = '<div class="empty">📭 ไม่มีข้อมูลสำหรับวันนี้</div>';
+    return;
+  }
+
   const byRoom = {};
   dayRecords.forEach(r => {
     const code = `${r.grade}/${r.room}`;
@@ -1076,7 +1147,7 @@ function renderWeekly(weekKey) {
           const rank = rankMap[r.code];
           return `
             <tr class="clickable-row" data-code="${r.code}">
-              <td>${r.code}</td>
+              <td>${r.code}<div class="row-hint">กดเพื่อดูรายละเอียด</div></td>
               <td class="teacher-col">${teacher}</td>
               <td>${r.count}</td>
               <td class="score-cell">${r.avg}</td>
