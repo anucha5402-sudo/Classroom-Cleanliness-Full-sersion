@@ -94,41 +94,57 @@ body::after {
   --radius-lg: 16px;
 }
 
-/* ---------- Landing hero (headline style) ---------- */
+/* ---------- Landing hero (liquid glass) ---------- */
 .hero-card {
   position: relative; overflow: hidden;
   margin-top: 14px; padding: 18px 18px 14px; border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, #1479c9 0%, #2f9fdb 45%, #6fc4ec 100%);
-  box-shadow: 0 14px 32px rgba(20, 121, 201, 0.3), inset 0 1px 0 rgba(255,255,255,0.35);
+  background: linear-gradient(135deg, #0d3a66 0%, #1479c9 55%, #2f9fdb 100%);
+  box-shadow: 0 16px 40px rgba(20, 121, 201, 0.3), inset 0 1px 0 rgba(255,255,255,0.25);
   animation: fadeUp 0.4s ease;
 }
-.hero-card::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(120deg, rgba(255,255,255,0.22) 0%, transparent 35%);
+.hero-decor { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(6px); z-index: 0; }
+.hero-decor.hd1 {
+  width: 200px; height: 200px; top: -70px; right: -50px;
+  background: radial-gradient(circle, rgba(123,227,255,0.55), transparent 70%);
+  animation: driftA 16s ease-in-out infinite alternate;
 }
-.hero-decor { position: absolute; border-radius: 50%; background: rgba(255,255,255,0.14); pointer-events: none; animation: driftA 18s ease-in-out infinite alternate; }
-.hero-decor.hd1 { width: 120px; height: 120px; top: -50px; right: -30px; }
-.hero-decor.hd2 { width: 90px; height: 90px; bottom: -45px; left: -25px; background: rgba(255,255,255,0.10); animation: driftB 20s ease-in-out infinite alternate; }
+.hero-decor.hd2 {
+  width: 170px; height: 170px; bottom: -60px; left: -40px;
+  background: radial-gradient(circle, rgba(255,255,255,0.28), transparent 70%);
+  animation: driftB 20s ease-in-out infinite alternate;
+}
+.hero-decor.hd3 {
+  width: 150px; height: 150px; top: 35%; right: -55px;
+  background: radial-gradient(circle, rgba(111,196,236,0.5), transparent 70%);
+  animation: driftA 24s ease-in-out infinite alternate-reverse;
+}
+.hero-glass-pane {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.1) 100%);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(255,255,255,0.08), inset 1px 0 0 rgba(255,255,255,0.12);
+}
 
 .hero-v2 { text-align: center; padding: 26px 18px 22px; }
-.hero-top-row { position: relative; z-index: 1; display: flex; justify-content: center; margin-bottom: 10px; }
+.hero-top-row { position: relative; z-index: 2; display: flex; justify-content: center; margin-bottom: 10px; }
 .hero-logo-sm {
   width: 42px; height: 42px; border-radius: 50%; background: #fff; object-fit: contain;
   box-shadow: 0 4px 10px rgba(0,0,0,0.18); border: 2px solid rgba(255,255,255,0.6);
 }
 .hero-overline {
-  position: relative; z-index: 1; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  position: relative; z-index: 2; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
   color: rgba(255,255,255,0.78); font-weight: 700; margin-bottom: 6px;
 }
 .hero-headline {
-  position: relative; z-index: 1; margin: 0 0 16px; font-weight: 800; color: #fff;
+  position: relative; z-index: 2; margin: 0 0 16px; font-weight: 800; color: #fff;
   font-size: clamp(42px, 15vw, 68px); line-height: 1.35; white-space: nowrap;
   text-shadow: 0.6px 0 currentColor, -0.6px 0 currentColor, 0 0.6px currentColor, 0 -0.6px currentColor;
 }
 .accent-cyan { color: #7be3ff; }
-.hero-subline { position: relative; z-index: 1; font-size: 13px; color: rgba(255,255,255,0.92); margin: 0 0 20px; }
+.hero-subline { position: relative; z-index: 2; font-size: 13px; color: rgba(255,255,255,0.92); margin: 0 0 20px; }
 
-.hero-cta-group { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.hero-cta-group { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .hero-cta-main {
   width: auto; max-width: 280px; padding: 15px 32px; border-radius: 999px; border: none; cursor: pointer;
   font-family: inherit; font-size: 16px; font-weight: 800; letter-spacing: 0.3px; color: #fff;
@@ -146,7 +162,7 @@ body::after {
 .hero-cta-sub:hover { background: rgba(255,255,255,0.22); transform: translateY(-1px); }
 
 .hero-status-line {
-  position: relative; z-index: 1; margin-top: 18px; padding-top: 12px;
+  position: relative; z-index: 2; margin-top: 18px; padding-top: 12px;
   border-top: 1px solid rgba(255,255,255,0.22);
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 10px;
   font-size: 10.5px; color: rgba(255,255,255,0.88);
