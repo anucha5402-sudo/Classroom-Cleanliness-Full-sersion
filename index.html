@@ -73,6 +73,7 @@
     <div class="subtabs">
       <button class="subtab active" data-vtab="daily">ภาพรวมรายวัน</button>
       <button class="subtab" data-vtab="weekly">ค่าเฉลี่ยรายสัปดาห์</button>
+      <button class="subtab" data-vtab="monthly">ภาพรวมรายเดือน</button>
     </div>
 
     <div id="vpanel-daily">
@@ -101,6 +102,23 @@
       <div class="card" id="weekly-issues-container" style="display:none;">
         <h2>สรุปหัวข้อที่ควรปรับปรุงแต่ละห้อง</h2>
         <div id="weekly-issues-list"></div>
+      </div>
+    </div>
+
+    <div id="vpanel-monthly" style="display:none;">
+      <div class="card">
+        <div class="field" style="max-width:260px;">
+          <label>เลือกเดือน</label>
+          <select id="month-select"></select>
+        </div>
+      </div>
+      <div class="legend-grid" id="monthly-legend"></div>
+      <div class="card" id="monthly-table-container">
+        <div class="empty">กำลังโหลด...</div>
+      </div>
+      <div class="card" id="monthly-issues-container" style="display:none;">
+        <h2>สรุปหัวข้อที่ควรปรับปรุงแต่ละห้อง (ทั้งเดือน)</h2>
+        <div id="monthly-issues-list"></div>
       </div>
     </div>
   </div>
@@ -188,6 +206,10 @@
     </div>
 
     <div id="epanel-mine" style="display:none;">
+      <div class="card" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <span style="font-size:13px; color:var(--text-muted);">ส่งออกข้อมูลทั้งหมดเป็นไฟล์ CSV (เปิดใน Excel ได้)</span>
+        <button class="ghost" id="export-csv-btn">📥 ส่งออก CSV</button>
+      </div>
       <div class="card" id="history-container">
         <div class="empty">กำลังโหลด...</div>
       </div>

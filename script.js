@@ -477,6 +477,7 @@ document.getElementById('btn-go-viewer').addEventListener('click', () => {
   showPage('page-viewer');
   loadDaily();
   loadWeekly();
+  loadMonthly();
 });
 document.getElementById('viewer-back').addEventListener('click', () => {
   showPage(isLoggedInInspector ? 'page-entry' : 'page-landing');
@@ -573,6 +574,7 @@ document.getElementById('entry-check-scores').addEventListener('click', () => {
   showPage('page-viewer');
   loadDaily();
   loadWeekly();
+  loadMonthly();
 });
 
 document.getElementById('pw-submit').addEventListener('click', async () => {
@@ -604,6 +606,7 @@ document.querySelectorAll('.subtab[data-vtab]').forEach(tab => {
     tab.classList.add('active');
     document.getElementById('vpanel-daily').style.display = tab.dataset.vtab === 'daily' ? 'block' : 'none';
     document.getElementById('vpanel-weekly').style.display = tab.dataset.vtab === 'weekly' ? 'block' : 'none';
+    document.getElementById('vpanel-monthly').style.display = tab.dataset.vtab === 'monthly' ? 'block' : 'none';
   });
 });
 
@@ -1327,6 +1330,186 @@ function renderWeekly(weekKey) {
     issuesContainer.style.display = 'none';
   }
 }
+
+function getMonthInfo(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const label = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', { year: 'numeric', month: 'long' }).format(d);
+  return { key, label };
+}
+
+let monthlyGroupsCache = {};
+
+async function loadMonthly() {
+  const records = await loadAllRecords();
+  const groups = {};
+  records.forEach(r => {
+    const info = getMonthInfo(r.date);
+    if (!groups[info.key]) groups[info.key] = { label: info.label, rooms: {} };
+    const code = `${r.grade}/${r.room}`;
+    if (!groups[info.key].rooms[code]) groups[info.key].rooms[code] = [];
+    groups[info.key].rooms[code].push(r);
+  });
+  monthlyGroupsCache = groups;
+  const monthSelect = document.getElementById('month-select');
+  const keys = Object.keys(groups).sort().reverse();
+  const prevSelected = monthSelect.value;
+  if (!keys.length) {
+    monthSelect.innerHTML = '<option value="">ยังไม่มีข้อมูล</option>';
+    renderMonthly(null);
+    return;
+  }
+  monthSelect.innerHTML = keys.map(k => `<option value="${k}">${groups[k].label}</option>`).join('');
+  monthSelect.value = keys.includes(prevSelected) ? prevSelected : keys[0];
+  renderMonthly(monthSelect.value);
+}
+document.getElementById('month-select').addEventListener('change', (e) => renderMonthly(e.target.value));
+
+function renderMonthly(monthKey) {
+  const legendEl = document.getElementById('monthly-legend');
+  const tableEl = document.getElementById('monthly-table-container');
+  const issuesContainer = document.getElementById('monthly-issues-container');
+  const issuesList = document.getElementById('monthly-issues-list');
+  if (!monthKey || !monthlyGroupsCache[monthKey]) {
+    legendEl.innerHTML = '';
+    tableEl.innerHTML = '<div class="empty">ยังไม่มีข้อมูลการตรวจในเดือนนี้</div>';
+    issuesContainer.style.display = 'none';
+    return;
+  }
+  const group = monthlyGroupsCache[monthKey];
+  const counts = { excellent: 0, pass: 0, improve: 0, urgent: 0 };
+  const rows = ROOM_CODES.map(code => {
+    const recs = group.rooms[code];
+    if (!recs) return { code, avg: null };
+    const avg = Math.round(recs.reduce((a,b)=>a+b.total,0) / recs.length);
+    return { code, avg, count: recs.length, recs };
+  });
+  rows.forEach(r => { if (r.avg !== null) counts[classifyLevel(r.avg).cls]++; });
+
+  const ranked = rows.filter(r => r.avg !== null).slice().sort((a, b) => b.avg - a.avg);
+  const rankMap = {};
+  ranked.slice(0, 3).forEach((r, idx) => { rankMap[r.code] = idx + 1; });
+  const rankMedal = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+  legendEl.innerHTML = `
+    <div class="legend-item"><div class="lcount" style="color:#1a8f4c;">${counts.excellent}</div><div>ผ่านเกณฑ์ดีเยี่ยม</div></div>
+    <div class="legend-item"><div class="lcount" style="color:#1479c9;">${counts.pass}</div><div>ผ่านเกณฑ์</div></div>
+    <div class="legend-item"><div class="lcount" style="color:#b17600;">${counts.improve}</div><div>ควรปรับปรุง</div></div>
+    <div class="legend-item"><div class="lcount" style="color:#d64545;">${counts.urgent}</div><div>ต้องปรับปรุงโดยด่วน</div></div>
+  `;
+
+  tableEl.innerHTML = `
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th>ห้อง</th><th>ครูประจำชั้น</th><th>จำนวนครั้งที่ตรวจ</th><th>คะแนนเฉลี่ย</th><th>ระดับ</th></tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          const teacher = teacherNamesFor(r.code);
+          if (r.avg === null) return `<tr><td>${r.code}</td><td class="teacher-col">${teacher}</td><td>-</td><td>-</td><td style="color:var(--text-muted);">ไม่มีข้อมูล</td></tr>`;
+          const lvl = classifyLevel(r.avg);
+          const rank = rankMap[r.code];
+          return `
+            <tr class="clickable-row" data-code="${r.code}">
+              <td>${r.code}<div class="row-hint">กดเพื่อดูรายละเอียด</div></td>
+              <td class="teacher-col">${teacher}</td>
+              <td>${r.count}</td>
+              <td class="score-cell">${r.avg}</td>
+              <td><span class="badge ${lvl.cls}">${lvl.label}</span>${rank ? `<span class="rank-badge r${rank}">${rankMedal[rank]} อันดับ ${rank}</span>` : ''}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+
+  tableEl.querySelectorAll('tr.clickable-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const code = row.dataset.code;
+      const r = rows.find(x => x.code === code);
+      if (!r || !r.recs) return;
+      openRoomDetailModal(code, r.recs, `${group.label} &middot; ตรวจทั้งหมด ${r.recs.length} ครั้ง`);
+    });
+  });
+
+  const issueRooms = rows
+    .filter(r => r.recs && r.recs.length)
+    .map(r => ({ code: r.code, items: summarizeDeductions(r.recs) }))
+    .filter(r => r.items.length > 0)
+    .sort((a, b) => {
+      const sumA = a.items.reduce((s, i) => s + i.total, 0);
+      const sumB = b.items.reduce((s, i) => s + i.total, 0);
+      return sumB - sumA;
+    });
+
+  if (issueRooms.length) {
+    issuesContainer.style.display = 'block';
+    issuesList.innerHTML = issueRooms.map(r => {
+      const teacher = teacherNamesFor(r.code);
+      return `
+        <div class="issue-room-block">
+          <div class="issue-room-head">
+            <span class="issue-room-name">${r.code}</span>
+            ${teacher ? `<span class="issue-room-teacher">${teacher}</span>` : ''}
+          </div>
+          <div class="issue-tags">
+            ${r.items.map(i => `<span class="issue-tag">${i.icon} ${i.label} <b>-${i.total}</b></span>`).join('')}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    issuesContainer.style.display = 'none';
+  }
+}
+
+// ---------------- ส่งออกข้อมูลเป็น CSV ----------------
+function csvEscape(val) {
+  const s = String(val ?? '');
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+document.getElementById('export-csv-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-csv-btn');
+  const originalText = btn.textContent;
+  btn.textContent = 'กำลังเตรียมไฟล์...';
+  btn.disabled = true;
+  try {
+    const records = (await loadAllRecords()).slice().sort((a, b) => a.savedAt - b.savedAt);
+    const headers = ['วันที่', 'ห้อง', 'ครูประจำชั้น', 'ผู้ตรวจ', ...CRITERIA.map(c => c.label), 'กรณีพิเศษ', 'คะแนนรวม'];
+    const rows = records.map(r => {
+      const code = `${r.grade}/${r.room}`;
+      const critVals = CRITERIA.map(c => {
+        const lvl = r.selections && r.selections[c.key];
+        return lvl ? `ระดับ ${lvl}` : '';
+      });
+      let sevVal = '';
+      if (r.severity) {
+        const sev = SEVERITY.find(s => s.value === r.severity.level);
+        sevVal = (sev ? sev.label : '') + (r.severity.remark ? ' - ' + r.severity.remark : '');
+      }
+      return [r.date, code, teacherNamesFor(code), r.inspector || '', ...critVals, sevVal, r.total];
+    });
+    const csvContent = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `classroom-cleanliness-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    showMsg(document.getElementById('history-container'), 'ส่งออกไฟล์ไม่สำเร็จ กรุณาลองใหม่', 'err');
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+});
 
 // ==========================================================================
 // เริ่มต้นแอป
