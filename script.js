@@ -48,7 +48,7 @@ function teacherNamesFor(code) {
 const DEFAULT_PASSWORD = 'inspect2025';
 const PW_KEY = 'app-password';
 
-const state = { selections: {}, severityLevel: null, severityPhoto: null };
+const state = { selections: {}, severityLevel: null, severityPhoto: null, editingKey: null, editingSavedAt: null };
 
 // ==========================================================================
 // ชั้นเก็บข้อมูล (Storage layer)
@@ -800,6 +800,11 @@ function resetFormAfterSave() {
   state.selections = {};
   state.severityLevel = null;
   state.severityPhoto = null;
+  state.editingKey = null;
+  state.editingSavedAt = null;
+  document.getElementById('grade').disabled = false;
+  document.getElementById('room').disabled = false;
+  document.getElementById('edit-banner').style.display = 'none';
   document.querySelectorAll('#criteria-container .level-opt').forEach(o => o.classList.remove('selected'));
   document.querySelectorAll('#criteria-container input[type=radio]').forEach(r => { r.checked = false; });
   document.getElementById('severity-enable').checked = false;
@@ -824,6 +829,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     showMsg(msgArea, 'กรณีพิเศษต้องกรอกหมายเหตุและเลือกระดับความรุนแรงให้ครบ', 'err');
     return;
   }
+  const isEditing = !!state.editingKey;
   const grade = document.getElementById('grade').value;
   const room = document.getElementById('room').value;
   const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
@@ -834,13 +840,14 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     selections: { ...state.selections },
     severity: sevEnabled ? { level: state.severityLevel, remark, photo: state.severityPhoto || null } : null,
     total,
-    savedAt: Date.now()
+    savedAt: isEditing ? state.editingSavedAt : Date.now()
   };
+  if (isEditing) record.editedAt = Date.now();
 
   // แสดงหน้ายืนยันก่อนบันทึกจริง
   const confirmHtml = `
     <button class="modal-close-x" onclick="closeModal()">✕</button>
-    <h2>ยืนยันการบันทึก?</h2>
+    <h2>${isEditing ? 'ยืนยันการแก้ไข?' : 'ยืนยันการบันทึก?'}</h2>
     <div class="modal-sub">ห้อง ${grade}/${room} &middot; วันที่ ${date}${inspector ? ' &middot; ผู้ตรวจ: ' + inspector : ''}</div>
     ${buildBreakdownRowsHtml(record)}
     <div class="modal-total-line">
@@ -849,14 +856,14 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     </div>
     <div class="modal-actions">
       <button class="ghost" id="modal-edit-more" style="flex:1;">แก้ไขต่อ</button>
-      <button class="primary" id="modal-confirm-save" style="flex:1;">ยืนยันบันทึก</button>
+      <button class="primary" id="modal-confirm-save" style="flex:1;">${isEditing ? 'ยืนยันการแก้ไข' : 'ยืนยันบันทึก'}</button>
     </div>
   `;
   openModal(confirmHtml);
 
   document.getElementById('modal-edit-more').addEventListener('click', closeModal);
   document.getElementById('modal-confirm-save').addEventListener('click', async () => {
-    const key = `eval:${grade}-${room}:${record.savedAt}`;
+    const key = isEditing ? state.editingKey : `eval:${grade}-${room}:${record.savedAt}`;
     const confirmBtn = document.getElementById('modal-confirm-save');
     confirmBtn.textContent = 'กำลังบันทึก...';
     confirmBtn.disabled = true;
@@ -865,11 +872,13 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       if (!res) throw new Error('save failed');
       openModal(`
         <div class="success-check">✓</div>
-        <div class="success-title">ยืนยันสำเร็จ</div>
-        <div class="success-sub">บันทึกผลการตรวจห้อง ${grade}/${room} เรียบร้อยแล้ว (คะแนน ${total})</div>
+        <div class="success-title">${isEditing ? 'แก้ไขสำเร็จ' : 'ยืนยันสำเร็จ'}</div>
+        <div class="success-sub">${isEditing ? 'อัปเดต' : 'บันทึก'}ผลการตรวจห้อง ${grade}/${room} เรียบร้อยแล้ว (คะแนน ${total})</div>
         <button class="primary" style="width:100%;" onclick="closeModal()">ตกลง</button>
       `);
+      const wasEditing = isEditing;
       resetFormAfterSave();
+      if (wasEditing) showEntryTab('mine');
     } catch (err) {
       openModal(`
         <button class="modal-close-x" onclick="closeModal()">✕</button>
@@ -966,14 +975,17 @@ async function loadHistory() {
             <td>${r.date}</td>
             <td>${r.inspector || '-'}</td>
             <td class="score-cell" style="color:${scoreColor(r.total)}">${r.total}</td>
-            <td><button class="ghost" data-key="${r.key}">ลบ</button></td>
+            <td style="white-space:nowrap;">
+              <button class="ghost" data-action="edit" data-key="${r.key}">แก้ไข</button>
+              <button class="ghost" data-action="delete" data-key="${r.key}">ลบ</button>
+            </td>
           </tr>
         `).join('')}
       </tbody>
     </table>
     </div>
   `;
-  container.querySelectorAll('button.ghost').forEach(btn => {
+  container.querySelectorAll('button[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       try {
         await storage.delete(btn.dataset.key);
@@ -981,6 +993,121 @@ async function loadHistory() {
       } catch (e) {}
     });
   });
+  container.querySelectorAll('button[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const record = records.find(r => r.key === btn.dataset.key);
+      if (record) startEditRecord(record);
+    });
+  });
+}
+
+// ---------------- แก้ไขข้อมูลที่เคยบันทึกไว้ ----------------
+function startEditRecord(record) {
+  state.editingKey = record.key;
+  state.editingSavedAt = record.savedAt;
+  state.selections = { ...record.selections };
+  state.severityLevel = record.severity ? record.severity.level : null;
+  state.severityPhoto = record.severity ? (record.severity.photo || null) : null;
+
+  document.getElementById('grade').value = record.grade;
+  document.getElementById('grade').disabled = true;
+  document.getElementById('room').value = record.room;
+  document.getElementById('room').disabled = true;
+  document.getElementById('date').value = record.date;
+  document.getElementById('inspector').value = record.inspector || '';
+  updateTeacherHint();
+
+  document.querySelectorAll('#criteria-container .level-opt').forEach(opt => {
+    const key = opt.dataset.key;
+    const level = parseInt(opt.dataset.level);
+    const isSelected = state.selections[key] === level;
+    opt.classList.toggle('selected', isSelected);
+    opt.querySelector('input').checked = isSelected;
+  });
+
+  const sevEnable = document.getElementById('severity-enable');
+  const sevFields = document.getElementById('severity-fields');
+  if (record.severity) {
+    sevEnable.checked = true;
+    sevFields.style.display = 'block';
+    document.getElementById('severity-remark').value = record.severity.remark || '';
+    document.querySelectorAll('#severity-levels .level-opt').forEach(opt => {
+      const isSelected = parseInt(opt.dataset.level) === state.severityLevel;
+      opt.classList.toggle('selected', isSelected);
+      opt.querySelector('input').checked = isSelected;
+    });
+  } else {
+    sevEnable.checked = false;
+    sevFields.style.display = 'none';
+    document.getElementById('severity-remark').value = '';
+    document.querySelectorAll('#severity-levels .level-opt').forEach(o => o.classList.remove('selected'));
+  }
+  renderPhotoPreview();
+
+  const banner = document.getElementById('edit-banner');
+  document.getElementById('edit-banner-text').textContent = `✏️ กำลังแก้ไขข้อมูล ห้อง ${record.grade}/${record.room} วันที่ ${record.date}`;
+  banner.style.display = 'flex';
+
+  updateScore();
+  showEntryTab('form');
+}
+
+function cancelEditRecord() {
+  state.editingKey = null;
+  state.editingSavedAt = null;
+  document.getElementById('grade').disabled = false;
+  document.getElementById('room').disabled = false;
+  document.getElementById('edit-banner').style.display = 'none';
+  resetFormAfterSave();
+}
+document.getElementById('edit-cancel-btn').addEventListener('click', cancelEditRecord);
+
+document.getElementById('entry-view-criteria').addEventListener('click', showCriteriaInfoModal);
+document.getElementById('btn-view-criteria-landing').addEventListener('click', showCriteriaInfoModal);
+
+function showCriteriaInfoModal() {
+  const criteriaRows = CRITERIA.map(c => `
+    <div class="crit-info-block">
+      <div class="crit-info-head">${c.icon} ${c.label}</div>
+      <div class="crit-info-levels">
+        ${c.levels.map((lv, i) => `
+          <div class="crit-info-row">
+            <span>ระดับ ${i + 1} - ${lv}</span>
+            <b>${c.pts[i] === 0 ? '0' : '-' + c.pts[i]}</b>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  const severityRows = SEVERITY.map(s => `
+    <div class="crit-info-row">
+      <span>${s.label}</span>
+      <b>-${s.pts}</b>
+    </div>
+  `).join('');
+
+  const html = `
+    <button class="modal-close-x" onclick="closeModal()">✕</button>
+    <h2>ℹ️ เกณฑ์การให้คะแนน</h2>
+    <div class="modal-sub">คะแนนเต็ม 100 คะแนนต่อห้อง หักตามระดับในแต่ละหัวข้อ</div>
+    ${criteriaRows}
+    <div class="crit-info-block">
+      <div class="crit-info-head">⚠️ กรณีพิเศษ (ความเสียหายรุนแรง เช่น โต๊ะหัก)</div>
+      <div class="crit-info-levels">${severityRows}</div>
+      <div class="crit-info-note">ต้องกรอกหมายเหตุก่อนถึงจะเลือกระดับความรุนแรงได้ คะแนนอาจติดลบได้หากหักสะสมเกิน 100</div>
+    </div>
+    <div class="crit-info-block">
+      <div class="crit-info-head">🏅 เกณฑ์ระดับรายสัปดาห์ (จากคะแนนเฉลี่ย)</div>
+      <div class="crit-info-levels">
+        <div class="crit-info-row"><span>90 ขึ้นไป</span><b class="lvl-excellent">ผ่านเกณฑ์ดีเยี่ยม</b></div>
+        <div class="crit-info-row"><span>75 - 89</span><b class="lvl-pass">ผ่านเกณฑ์</b></div>
+        <div class="crit-info-row"><span>50 - 74</span><b class="lvl-improve">ควรปรับปรุง</b></div>
+        <div class="crit-info-row"><span>ต่ำกว่า 50</span><b class="lvl-urgent">ต้องปรับปรุงโดยด่วน</b></div>
+      </div>
+    </div>
+  `;
+  openModal(html);
 }
 
 // ==========================================================================

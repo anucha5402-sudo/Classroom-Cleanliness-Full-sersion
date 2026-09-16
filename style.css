@@ -445,6 +445,25 @@ tbody tr:hover { background: var(--sky-light); }
 .donate-copy-btn:hover { box-shadow: 0 6px 18px rgba(255, 120, 60, 0.42) !important; }
 .donate-tax-note { font-size: 11.5px; color: var(--text-muted); text-align: center; margin: 10px 0 0; line-height: 1.5; }
 
+.edit-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  background: var(--accent-light); border: 1.5px dashed var(--accent); border-radius: var(--radius-sm);
+  padding: 10px 14px; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: #7a5410;
+}
+
+.crit-info-block { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 12px; }
+.crit-info-block:last-child { margin-bottom: 0; }
+.crit-info-head { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.crit-info-levels { display: flex; flex-direction: column; gap: 4px; }
+.crit-info-row { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; padding: 3px 0; }
+.crit-info-row span { color: var(--text-muted); }
+.crit-info-row b { color: var(--text); font-weight: 700; }
+.crit-info-note { font-size: 11px; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+.lvl-excellent { color: #1a8f4c !important; }
+.lvl-pass { color: var(--primary-dark) !important; }
+.lvl-improve { color: #a06800 !important; }
+.lvl-urgent { color: var(--danger) !important; }
+
 .subtabs { display: flex; gap: 4px; margin-bottom: 16px; background: rgba(255,255,255,0.7); border: 1px solid var(--border); border-radius: 999px; padding: 4px; width: fit-content; max-width: 100%; overflow-x: auto; }
 .subtab { padding: 9px 18px; font-size: 13.5px; cursor: pointer; border: none; background: none; color: var(--text-muted); border-radius: 999px; font-family: inherit; transition: all 0.2s; white-space: nowrap; }
 .subtab:hover { color: var(--primary); }
