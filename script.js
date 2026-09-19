@@ -136,6 +136,68 @@ const storage = {
   list: (...args) => (USE_FIREBASE ? firebaseAdapter : localAdapter).list(...args)
 };
 
+// ==========================================================================
+// คิวสำรอง กันข้อมูลหายตอนเน็ตหลุดขณะบันทึก
+// ==========================================================================
+const PENDING_KEY = 'pending-queue-v1';
+
+function getPendingQueue() {
+  try { return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); } catch (e) { return []; }
+}
+function setPendingQueue(q) {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(q)); } catch (e) {}
+}
+
+async function safeStorageSet(key, value) {
+  try {
+    const res = await storage.set(key, value);
+    if (!res) throw new Error('save failed');
+    return { ok: true };
+  } catch (e) {
+    const q = getPendingQueue();
+    q.push({ key, value, queuedAt: Date.now() });
+    setPendingQueue(q);
+    updatePendingBadge();
+    return { ok: false, queued: true };
+  }
+}
+
+async function flushPendingQueue() {
+  const q = getPendingQueue();
+  if (!q.length || !USE_FIREBASE) return;
+  const remaining = [];
+  let succeeded = 0;
+  for (const item of q) {
+    try {
+      const res = await storage.set(item.key, item.value);
+      if (!res) throw new Error('fail');
+      succeeded++;
+    } catch (e) {
+      remaining.push(item);
+    }
+  }
+  setPendingQueue(remaining);
+  updatePendingBadge();
+  if (succeeded > 0) {
+    if (document.getElementById('epanel-mine') && document.getElementById('epanel-mine').style.display !== 'none') loadHistory();
+  }
+}
+
+function updatePendingBadge() {
+  const q = getPendingQueue();
+  const badge = document.getElementById('pending-badge');
+  if (!badge) return;
+  if (q.length > 0) {
+    badge.style.display = 'inline-flex';
+    badge.textContent = `⏳ รอส่งขึ้นฐานข้อมูล ${q.length} รายการ`;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+window.addEventListener('online', flushPendingQueue);
+setInterval(flushPendingQueue, 30000);
+
 function renderConnBadges() {
   const html = USE_FIREBASE
     ? `<span class="conn-badge online"><span class="conn-dot online"></span>เชื่อมต่อฐานข้อมูลกลาง</span>`
@@ -616,6 +678,7 @@ function showEntryTab(tab) {
   document.getElementById('epanel-mine').style.display = tab === 'mine' ? 'block' : 'none';
   document.getElementById('epanel-pw').style.display = tab === 'pw' ? 'block' : 'none';
   if (tab === 'mine') loadHistory();
+  if (tab === 'form') updateUntestedReminder();
 }
 document.querySelectorAll('.subtab[data-etab]').forEach(tab => {
   tab.addEventListener('click', () => showEntryTab(tab.dataset.etab));
@@ -648,6 +711,29 @@ function updateTeacherHint() {
 }
 document.getElementById('grade').addEventListener('change', updateTeacherHint);
 document.getElementById('room').addEventListener('change', updateTeacherHint);
+
+async function updateUntestedReminder() {
+  const el = document.getElementById('untested-reminder');
+  if (!el) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const dayOfWeek = new Date(todayStr + 'T00:00:00').getDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    el.style.display = 'none';
+    return;
+  }
+  const records = await loadAllRecords();
+  const testedToday = new Set(records.filter(r => r.date === todayStr).map(r => `${r.grade}/${r.room}`));
+  const untested = ROOM_CODES.filter(code => !testedToday.has(code));
+  if (!untested.length) {
+    el.className = 'untested-reminder done';
+    el.textContent = '🎉 วันนี้ตรวจครบทุกห้องแล้ว เยี่ยมมาก!';
+    el.style.display = 'block';
+  } else {
+    el.className = 'untested-reminder';
+    el.textContent = `📋 วันนี้ยังไม่ได้ตรวจ ${untested.length} ห้อง: ${untested.join(', ')}`;
+    el.style.display = 'block';
+  }
+}
 
 function buildCriteria() {
   const container = document.getElementById('criteria-container');
@@ -870,9 +956,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     const confirmBtn = document.getElementById('modal-confirm-save');
     confirmBtn.textContent = 'กำลังบันทึก...';
     confirmBtn.disabled = true;
-    try {
-      const res = await storage.set(key, JSON.stringify(record));
-      if (!res) throw new Error('save failed');
+    const result = await safeStorageSet(key, JSON.stringify(record));
+    if (result.ok) {
       openModal(`
         <div class="success-check">✓</div>
         <div class="success-title">${isEditing ? 'แก้ไขสำเร็จ' : 'ยืนยันสำเร็จ'}</div>
@@ -881,8 +966,20 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       `);
       const wasEditing = isEditing;
       resetFormAfterSave();
+      updateUntestedReminder();
       if (wasEditing) showEntryTab('mine');
-    } catch (err) {
+    } else if (result.queued) {
+      openModal(`
+        <div class="success-check" style="background:var(--accent-light); color:#a06800;">⏳</div>
+        <div class="success-title">บันทึกไว้ในเครื่องแล้ว</div>
+        <div class="success-sub">ตอนนี้เชื่อมต่ออินเทอร์เน็ตไม่ได้ ระบบเก็บข้อมูลห้อง ${grade}/${room} ไว้ในเครื่องนี้ก่อน จะส่งขึ้นฐานข้อมูลกลางให้อัตโนมัติทันทีที่เน็ตกลับมา (ห้ามล้างข้อมูลเบราว์เซอร์ก่อนเน็ตกลับมา)</div>
+        <button class="primary" style="width:100%;" onclick="closeModal()">เข้าใจแล้ว</button>
+      `);
+      const wasEditing = isEditing;
+      resetFormAfterSave();
+      updateUntestedReminder();
+      if (wasEditing) showEntryTab('mine');
+    } else {
       openModal(`
         <button class="modal-close-x" onclick="closeModal()">✕</button>
         <h2>บันทึกไม่สำเร็จ</h2>
@@ -1117,6 +1214,21 @@ function showCriteriaInfoModal() {
 // ภาพรวมรายวัน (สาธารณะ)
 // ==========================================================================
 document.getElementById('daily-date').addEventListener('change', loadDaily);
+
+document.getElementById('daily-prev-day').addEventListener('click', () => {
+  const input = document.getElementById('daily-date');
+  const d = new Date((input.value || new Date().toISOString().slice(0,10)) + 'T00:00:00');
+  d.setDate(d.getDate() - 1);
+  input.value = d.toISOString().slice(0, 10);
+  loadDaily();
+});
+document.getElementById('daily-next-day').addEventListener('click', () => {
+  const input = document.getElementById('daily-date');
+  const d = new Date((input.value || new Date().toISOString().slice(0,10)) + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  input.value = d.toISOString().slice(0, 10);
+  loadDaily();
+});
 
 async function loadDaily() {
   const dateInput = document.getElementById('daily-date');
@@ -1521,4 +1633,12 @@ document.getElementById('date').value = new Date().toISOString().slice(0,10);
 document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
 updateScore();
 updateTeacherHint();
+updatePendingBadge();
+flushPendingQueue();
 showPage('page-landing');
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}

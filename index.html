@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ระบบให้คะแนนความสะอาดห้องเรียน - โรงเรียนดารุสสลามวิทยา</title>
 <link rel="icon" href="assets/logo-school.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="theme-color" content="#1479c9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
@@ -78,9 +81,13 @@
 
     <div id="vpanel-daily">
       <div class="card">
-        <div class="field" style="max-width:220px;">
-          <label>เลือกวันที่</label>
-          <input type="date" id="daily-date">
+        <div class="row" style="align-items:flex-end;">
+          <button class="ghost" id="daily-prev-day" title="วันก่อนหน้า">‹</button>
+          <div class="field" style="max-width:200px;">
+            <label>เลือกวันที่</label>
+            <input type="date" id="daily-date">
+          </div>
+          <button class="ghost" id="daily-next-day" title="วันถัดไป">›</button>
         </div>
       </div>
       <div class="card" id="daily-grid-container">
@@ -128,6 +135,7 @@
       <h1 style="margin:0;">กรอกข้อมูลการตรวจ</h1>
       <div class="row" style="gap:8px;">
         <span id="conn-badge-entry"></span>
+        <span id="pending-badge" class="conn-badge offline" style="display:none;"></span>
         <button class="ghost" id="entry-view-criteria">ℹ️ เกณฑ์คะแนน</button>
         <button class="ghost" id="entry-check-scores">📊 เช็คคะแนน</button>
         <button class="ghost" id="entry-logout">ออกจากระบบ</button>
@@ -145,6 +153,7 @@
         <span id="edit-banner-text"></span>
         <button class="ghost" id="edit-cancel-btn">ยกเลิกการแก้ไข</button>
       </div>
+      <div id="untested-reminder" class="untested-reminder" style="display:none;"></div>
       <div class="card">
         <div class="row">
           <div class="field">
