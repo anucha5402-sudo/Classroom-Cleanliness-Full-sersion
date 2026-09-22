@@ -278,6 +278,41 @@ function scoreColor(total) {
   return total < 0 ? '#d64545' : total < 60 ? '#b17600' : '#1479c9';
 }
 
+// ---------------- เสียง/สั่น ตอนบันทึกสำเร็จ ----------------
+function vibrate(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+}
+
+function playTone(freqStart, freqEnd, duration, volume) {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freqEnd, ctx.currentTime + duration);
+    gain.gain.setValueAtTime(volume, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+    osc.onended = () => ctx.close();
+  } catch (e) {}
+}
+
+function playSuccessFeedback() {
+  vibrate(60);
+  playTone(880, 1320, 0.22, 0.15);
+}
+
+function playQueuedFeedback() {
+  vibrate([40, 60, 40]);
+  playTone(660, 520, 0.28, 0.12);
+}
+
 // รวมคะแนนที่ถูกหักแยกตามหัวข้อ จากหลายการตรวจ (ใช้สรุปปัญหารายสัปดาห์)
 function summarizeDeductions(recs) {
   const totals = {};
@@ -958,6 +993,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     confirmBtn.disabled = true;
     const result = await safeStorageSet(key, JSON.stringify(record));
     if (result.ok) {
+      playSuccessFeedback();
       openModal(`
         <div class="success-check">✓</div>
         <div class="success-title">${isEditing ? 'แก้ไขสำเร็จ' : 'ยืนยันสำเร็จ'}</div>
@@ -969,6 +1005,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
       updateUntestedReminder();
       if (wasEditing) showEntryTab('mine');
     } else if (result.queued) {
+      playQueuedFeedback();
       openModal(`
         <div class="success-check" style="background:var(--accent-light); color:#a06800;">⏳</div>
         <div class="success-title">บันทึกไว้ในเครื่องแล้ว</div>
