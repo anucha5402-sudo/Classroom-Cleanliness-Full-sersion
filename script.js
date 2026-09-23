@@ -1661,6 +1661,21 @@ document.getElementById('export-csv-btn').addEventListener('click', async () => 
 });
 
 // ==========================================================================
+// โหมดมืด (Dark mode)
+// ==========================================================================
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+  try { localStorage.setItem('theme-pref', theme); } catch (e) {}
+}
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+
+// ==========================================================================
 // เริ่มต้นแอป
 // ==========================================================================
 initStorage();

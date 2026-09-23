@@ -2,6 +2,15 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem('theme-pref');
+    if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark';
+    if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  } catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ระบบให้คะแนนความสะอาดห้องเรียน - โรงเรียนดารุสสลามวิทยา</title>
 <link rel="icon" href="assets/logo-school.png">
@@ -20,6 +29,7 @@
 </head>
 <body>
 <div class="app">
+<button id="theme-toggle" class="theme-toggle-btn" title="สลับโหมดมืด">🌙</button>
 
   <div id="page-landing" class="landing">
     <div class="hero-card hero-v2">

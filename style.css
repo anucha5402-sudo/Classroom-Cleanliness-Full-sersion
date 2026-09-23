@@ -637,3 +637,77 @@ tr.clickable-row:hover td { color: var(--primary-dark); }
   table { font-size: 12px; }
   th, td { padding: 8px 5px; }
 }
+
+/* ---------- Dark mode toggle button ---------- */
+.theme-toggle-btn {
+  position: fixed; top: 14px; right: 14px; z-index: 40;
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); cursor: pointer;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow); font-size: 17px; display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, transform 0.15s;
+}
+.theme-toggle-btn:hover { transform: scale(1.08); }
+.theme-toggle-btn:active { transform: scale(0.96); }
+
+/* ==========================================================================
+   Dark mode
+   ========================================================================== */
+:root[data-theme="dark"] {
+  --primary: #4fa8e8;
+  --primary-dark: #7cc4f2;
+  --primary-light: rgba(79,168,232,0.18);
+  --sky: #5cc2f2;
+  --sky-light: rgba(92,194,242,0.14);
+  --accent: #ffcc66;
+  --accent-light: rgba(255,204,102,0.14);
+  --danger: #ff7a7a;
+  --danger-light: rgba(255,122,122,0.16);
+  --bg: #0f1720;
+  --card: #16212c;
+  --border: #2a3a4a;
+  --text: #e8eef4;
+  --text-muted: #8fa3b3;
+  --shadow: 0 2px 12px rgba(0,0,0,0.45);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,0.55);
+}
+:root[data-theme="dark"] body {
+  background: linear-gradient(160deg, #0c131a 0%, #0f1720 30%, #141f29 65%, #0f1720 100%);
+}
+:root[data-theme="dark"] body::before { background: radial-gradient(circle, rgba(79,168,232,0.22), transparent 70%); }
+:root[data-theme="dark"] body::after { background: radial-gradient(circle, rgba(255,204,102,0.12), transparent 70%); }
+:root[data-theme="dark"] .theme-toggle-btn { background: rgba(22,33,44,0.85); color: var(--text); }
+:root[data-theme="dark"] .card {
+  background: rgba(22,33,44,0.72);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.04);
+}
+:root[data-theme="dark"] .score-bar { background: rgba(22,33,44,0.9); }
+:root[data-theme="dark"] .subtabs { background: rgba(22,33,44,0.7); }
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] input[type=text],
+:root[data-theme="dark"] input[type=date],
+:root[data-theme="dark"] input[type=password],
+:root[data-theme="dark"] textarea {
+  background: #1c2833; color: var(--text); border-color: var(--border);
+}
+:root[data-theme="dark"] input[type=file] { background: #1c2833; color: var(--text-muted); }
+:root[data-theme="dark"] .score-ring-inner { background: #16212c; }
+:root[data-theme="dark"] .room-chip { background: #16212c; }
+:root[data-theme="dark"] .legend-item { background: #16212c; }
+:root[data-theme="dark"] .date-pill { background: #1c2833; color: var(--text-muted); }
+:root[data-theme="dark"] .modal-card { background: #16212c; color: var(--text); }
+:root[data-theme="dark"] button.ghost { color: var(--text-muted); border-color: var(--border); }
+:root[data-theme="dark"] button.ghost:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="dark"] .app-footer { color: var(--text-muted); }
+:root[data-theme="dark"] .app-footer .credit-title { color: var(--text); }
+:root[data-theme="dark"] table th { color: var(--text-muted); }
+:root[data-theme="dark"] tbody tr:hover { background: rgba(255,255,255,0.05); }
+:root[data-theme="dark"] .level-opt:hover { background: rgba(255,255,255,0.06); }
+:root[data-theme="dark"] .level-opt.selected { background: rgba(79,168,232,0.14); }
+:root[data-theme="dark"] .stat-box { background: #1c2833; }
+:root[data-theme="dark"] .donate-qr-card { background: #1c2833; border-color: #2a3a4a; }
+:root[data-theme="dark"] .crit-info-block { border-color: var(--border); }
+:root[data-theme="dark"] .row-hint { color: var(--sky); }
+:root[data-theme="dark"] .weekly-hint { color: var(--text-muted); }
+:root[data-theme="dark"] .issue-tag { background: rgba(255,122,122,0.14); color: #ffb3b3; }
+:root[data-theme="dark"] .issue-tag b { color: #ff8a8a; }
