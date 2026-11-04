@@ -236,6 +236,10 @@ function updateHeroStatusLine(recordsForTime) {
 // ==========================================================================
 // ยูทิลิตี้ทั่วไป
 // ==========================================================================
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 function showMsg(el, text, type) {
   el.innerHTML = `<div class="msg ${type}">${text}</div>`;
   if (type === 'ok') setTimeout(() => { el.innerHTML = ''; }, 3500);
@@ -360,7 +364,7 @@ function buildBreakdownRowsHtml(record) {
         <div style="display:flex; align-items:center; justify-content:space-between;">
           <div>
             <div class="mb-label">⚠️ กรณีพิเศษ: ${sev ? sev.label : ''}</div>
-            <div class="mb-sub">${record.severity.remark || ''}</div>
+            <div class="mb-sub">${esc(record.severity.remark)}</div>
           </div>
           <div class="mb-pts neg">-${sev ? sev.pts : 0}</div>
         </div>
@@ -375,7 +379,7 @@ function buildRecordBlockHtml(record) {
   return `
     <div class="modal-record-block">
       <div class="modal-record-meta">
-        ${record.date} ${record.inspector ? '&middot; ผู้ตรวจ: ' + record.inspector : ''}
+        ${record.date} ${record.inspector ? '&middot; ผู้ตรวจ: ' + esc(record.inspector) : ''}
       </div>
       ${buildBreakdownRowsHtml(record)}
       <div class="modal-total-line">
@@ -568,7 +572,7 @@ function drawScoreChart(canvas, records) {
 // ==========================================================================
 // การนำทางหน้า
 // ==========================================================================
-let isLoggedInInspector = false;
+let session = null; // { role: 'admin' | 'inspector', id, name }
 
 document.getElementById('btn-go-viewer').addEventListener('click', () => {
   showPage('page-viewer');
@@ -577,7 +581,7 @@ document.getElementById('btn-go-viewer').addEventListener('click', () => {
   loadMonthly();
 });
 document.getElementById('viewer-back').addEventListener('click', () => {
-  showPage(isLoggedInInspector ? 'page-entry' : 'page-landing');
+  showPage(session ? 'page-entry' : 'page-landing');
 });
 document.getElementById('btn-go-login').addEventListener('click', () => {
   document.getElementById('login-password').value = '';
@@ -640,31 +644,256 @@ document.querySelectorAll('.pw-toggle').forEach(btn => {
   });
 });
 
-async function getStoredPassword() {
+// ==========================================================================
+// ระบบบัญชีผู้ใช้ (ผู้ดูแล + ผู้ตรวจ)
+// ==========================================================================
+const ADMIN_HASH_KEY = 'admin-pw-hash';
+const INSPECTOR_PREFIX = 'inspector:';
+const SESSION_KEY = 'cr-session';
+
+async function hashPassword(pw) {
+  const text = 'classroomrecap:' + pw;
   try {
-    const res = await storage.get(PW_KEY);
-    return res ? res.value : DEFAULT_PASSWORD;
+    if (window.crypto && crypto.subtle) {
+      const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {}
+  let h = 5381;
+  for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return 'f' + (h >>> 0).toString(16);
+}
+
+// อ่านค่า: ไม่พบ = null, ปัญหาอื่น (เช่น เน็ตหลุด) = โยน error
+async function getVal(key) {
+  try {
+    const r = await storage.get(key);
+    return r ? r.value : null;
   } catch (e) {
-    return DEFAULT_PASSWORD;
+    if (e && e.message === 'not found') return null;
+    throw e;
   }
 }
 
-document.getElementById('login-submit').addEventListener('click', async () => {
-  const entered = document.getElementById('login-password').value;
-  const msgEl = document.getElementById('login-msg');
-  const correct = await getStoredPassword();
-  if (entered === correct) {
-    isLoggedInInspector = true;
-    showPage('page-entry');
-    showEntryTab('form');
-  } else {
-    showMsg(msgEl, 'รหัสผ่านไม่ถูกต้อง', 'err');
+async function getAdminHash() {
+  const stored = await getVal(ADMIN_HASH_KEY);
+  if (stored) return stored;
+  // รหัสเดิมที่เคยตั้งไว้ (เก็บแบบไม่เข้ารหัส) → แปลงเป็นแบบเข้ารหัสอัตโนมัติ
+  const legacy = (await getVal(PW_KEY)) || DEFAULT_PASSWORD;
+  const h = await hashPassword(legacy);
+  try {
+    await storage.set(ADMIN_HASH_KEY, h);
+    await storage.delete(PW_KEY).catch(() => {});
+  } catch (e) {}
+  return h;
+}
+
+async function listInspectors() {
+  const res = await storage.list(INSPECTOR_PREFIX);
+  const out = [];
+  for (const k of (res ? res.keys : [])) {
+    try {
+      const v = await getVal(k);
+      if (v) out.push(JSON.parse(v));
+    } catch (e) {}
   }
+  out.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  return out;
+}
+
+// ล็อกอินด้วยรหัสผ่านอย่างเดียว: ตรงกับผู้ดูแล หรือผู้ตรวจคนใดคนหนึ่ง
+async function authenticate(pw) {
+  const h = await hashPassword(pw);
+  if (h === await getAdminHash()) return { role: 'admin', id: 'admin', name: 'ผู้ดูแลระบบ' };
+  const m = (await listInspectors()).find(i => i.hash === h);
+  return m ? { role: 'inspector', id: m.id, name: m.name } : null;
+}
+
+function enterEntryPage() {
+  document.getElementById('user-chip').textContent = (session.role === 'admin' ? '🛡️ ' : '👤 ') + session.name;
+  document.getElementById('inspector-chip').innerHTML =
+    `<span class="ic-label">ผู้ตรวจ</span><b>${esc(session.name)}</b><span class="ic-note">บันทึกชื่ออัตโนมัติ</span>`;
+  document.getElementById('tab-admin').style.display = session.role === 'admin' ? '' : 'none';
+  showPage('page-entry');
+  showEntryTab('form');
+}
+
+function canModifyRecord(r) {
+  return !!session && (session.role === 'admin' || (r.inspectorId && r.inspectorId === session.id));
+}
+
+let loginFails = 0, loginLockUntil = 0;
+async function doLogin() {
+  const msgEl = document.getElementById('login-msg');
+  const entered = document.getElementById('login-password').value;
+  if (!entered) { showMsg(msgEl, 'กรุณากรอกรหัสผ่าน', 'err'); return; }
+  const wait = Math.ceil((loginLockUntil - Date.now()) / 1000);
+  if (wait > 0) { showMsg(msgEl, `ลองผิดหลายครั้ง กรุณารออีก ${wait} วินาที`, 'err'); return; }
+  const btn = document.getElementById('login-submit');
+  btn.disabled = true; btn.textContent = 'กำลังตรวจสอบ...';
+  try {
+    const user = await authenticate(entered);
+    if (user) {
+      loginFails = 0;
+      session = user;
+      try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch (e) {}
+      document.getElementById('login-password').value = '';
+      enterEntryPage();
+    } else {
+      loginFails++;
+      if (loginFails >= 5) { loginLockUntil = Date.now() + 30000; loginFails = 0; }
+      showMsg(msgEl, 'รหัสผ่านไม่ถูกต้อง', 'err');
+    }
+  } catch (e) {
+    showMsg(msgEl, 'เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่', 'err');
+  }
+  btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ';
+}
+document.getElementById('login-submit').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+function logout() {
+  session = null;
+  try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+  showPage('page-landing');
+}
+document.getElementById('entry-logout').addEventListener('click', logout);
+
+async function restoreSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s.role === 'inspector') {
+      const v = await getVal(INSPECTOR_PREFIX + s.id);
+      if (!v) { sessionStorage.removeItem(SESSION_KEY); return; }
+      s.name = JSON.parse(v).name;
+    } else if (s.role !== 'admin') return;
+    session = s;
+    enterEntryPage();
+  } catch (e) {}
+}
+
+// ---------------- หน้าจัดการผู้ตรวจ (เฉพาะผู้ดูแล) ----------------
+function validNewPassword(pw) {
+  if (!pw || pw.length < 4) return 'รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร';
+  return null;
+}
+
+async function passwordInUse(pw, ignoreId) {
+  const h = await hashPassword(pw);
+  if (h === await getAdminHash()) return true;
+  return (await listInspectors()).some(i => i.hash === h && i.id !== ignoreId);
+}
+
+async function renderAdminPanel() {
+  const box = document.getElementById('ins-list');
+  box.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+  let list;
+  try { list = await listInspectors(); }
+  catch (e) { box.innerHTML = '<div class="empty">โหลดข้อมูลไม่สำเร็จ</div>'; return; }
+  if (!list.length) { box.innerHTML = '<div class="empty">ยังไม่มีบัญชีผู้ตรวจ เพิ่มได้จากด้านบน</div>'; return; }
+  box.innerHTML = `
+    <div class="table-scroll"><table>
+      <thead><tr><th>ชื่อผู้ตรวจ</th><th>สร้างเมื่อ</th><th></th></tr></thead>
+      <tbody>${list.map(i => `
+        <tr>
+          <td><b>${esc(i.name)}</b></td>
+          <td>${i.createdAt ? new Date(i.createdAt).toLocaleDateString('th-TH') : '-'}</td>
+          <td style="white-space:nowrap;">
+            <button class="ghost" data-act="reset" data-id="${esc(i.id)}">เปลี่ยนรหัส</button>
+            <button class="ghost" data-act="del" data-id="${esc(i.id)}">ลบ</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  box.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ins = list.find(x => x.id === btn.dataset.id);
+      if (!ins) return;
+      if (btn.dataset.act === 'del') confirmDeleteInspector(ins);
+      else openResetInspectorModal(ins);
+    });
+  });
+}
+
+function confirmDeleteInspector(ins) {
+  openModal(`
+    <button class="modal-close-x" onclick="closeModal()">✕</button>
+    <h2>ลบบัญชี "${esc(ins.name)}" ?</h2>
+    <div class="modal-sub">ผู้ตรวจคนนี้จะเข้าระบบไม่ได้อีก ส่วนผลตรวจที่เคยบันทึกไว้ยังอยู่เหมือนเดิม</div>
+    <div class="modal-actions">
+      <button class="ghost" style="flex:1;" onclick="closeModal()">ยกเลิก</button>
+      <button class="primary" id="del-ins-ok" style="flex:1;background:var(--danger);">ลบบัญชี</button>
+    </div>`);
+  document.getElementById('del-ins-ok').addEventListener('click', async () => {
+    try { await storage.delete(INSPECTOR_PREFIX + ins.id); } catch (e) {}
+    closeModal();
+    renderAdminPanel();
+  });
+}
+
+function openResetInspectorModal(ins) {
+  openModal(`
+    <button class="modal-close-x" onclick="closeModal()">✕</button>
+    <h2>เปลี่ยนรหัสผ่านของ "${esc(ins.name)}"</h2>
+    <label style="margin-top:10px;">รหัสผ่านใหม่</label>
+    <input type="text" id="reset-pw-input" autocomplete="off" placeholder="อย่างน้อย 4 ตัวอักษร">
+    <div id="reset-msg" style="margin-top:10px;"></div>
+    <div class="modal-actions">
+      <button class="ghost" style="flex:1;" onclick="closeModal()">ยกเลิก</button>
+      <button class="primary" id="reset-ok" style="flex:1;">บันทึก</button>
+    </div>`);
+  document.getElementById('reset-ok').addEventListener('click', async () => {
+    const msg = document.getElementById('reset-msg');
+    const pw = document.getElementById('reset-pw-input').value;
+    const bad = validNewPassword(pw);
+    if (bad) { showMsg(msg, bad, 'err'); return; }
+    try {
+      if (await passwordInUse(pw, ins.id)) { showMsg(msg, 'รหัสผ่านนี้มีคนใช้อยู่แล้ว ลองรหัสอื่น', 'err'); return; }
+      await storage.set(INSPECTOR_PREFIX + ins.id, JSON.stringify({ ...ins, hash: await hashPassword(pw) }));
+      closeModal();
+      renderAdminPanel();
+    } catch (e) { showMsg(msg, 'บันทึกไม่สำเร็จ กรุณาลองใหม่', 'err'); }
+  });
+}
+
+document.getElementById('ins-add').addEventListener('click', async () => {
+  const msg = document.getElementById('ins-msg');
+  const name = document.getElementById('ins-name').value.trim();
+  const pw = document.getElementById('ins-pw').value;
+  if (!name) { showMsg(msg, 'กรุณากรอกชื่อผู้ตรวจ', 'err'); return; }
+  const bad = validNewPassword(pw);
+  if (bad) { showMsg(msg, bad, 'err'); return; }
+  try {
+    const list = await listInspectors();
+    if (list.some(i => i.name.toLowerCase() === name.toLowerCase())) { showMsg(msg, 'มีชื่อนี้ในระบบแล้ว', 'err'); return; }
+    if (await passwordInUse(pw)) { showMsg(msg, 'รหัสผ่านนี้มีคนใช้อยู่แล้ว ลองรหัสอื่น', 'err'); return; }
+    const id = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    await storage.set(INSPECTOR_PREFIX + id, JSON.stringify({ id, name, hash: await hashPassword(pw), createdAt: Date.now() }));
+    document.getElementById('ins-name').value = '';
+    document.getElementById('ins-pw').value = '';
+    showMsg(msg, `เพิ่มบัญชี "${esc(name)}" เรียบร้อย`, 'ok');
+    renderAdminPanel();
+  } catch (e) { showMsg(msg, 'บันทึกไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่', 'err'); }
 });
 
-document.getElementById('entry-logout').addEventListener('click', () => {
-  isLoggedInInspector = false;
-  showPage('page-landing');
+document.getElementById('pw-submit').addEventListener('click', async () => {
+  const cur = document.getElementById('pw-current').value;
+  const next = document.getElementById('pw-new').value;
+  const msgEl = document.getElementById('pw-msg');
+  try {
+    if (await hashPassword(cur) !== await getAdminHash()) { showMsg(msgEl, 'รหัสผ่านปัจจุบันไม่ถูกต้อง', 'err'); return; }
+    const bad = validNewPassword(next);
+    if (bad) { showMsg(msgEl, bad, 'err'); return; }
+    const h = await hashPassword(next);
+    if ((await listInspectors()).some(i => i.hash === h)) { showMsg(msgEl, 'รหัสนี้ซ้ำกับผู้ตรวจบางคน ลองรหัสอื่น', 'err'); return; }
+    await storage.set(ADMIN_HASH_KEY, h);
+    showMsg(msgEl, 'เปลี่ยนรหัสผ่านเรียบร้อย', 'ok');
+    document.getElementById('pw-current').value = '';
+    document.getElementById('pw-new').value = '';
+  } catch (e) {
+    showMsg(msgEl, 'บันทึกไม่สำเร็จ กรุณาลองใหม่', 'err');
+  }
 });
 
 document.getElementById('entry-check-scores').addEventListener('click', () => {
@@ -672,29 +901,6 @@ document.getElementById('entry-check-scores').addEventListener('click', () => {
   loadDaily();
   loadWeekly();
   loadMonthly();
-});
-
-document.getElementById('pw-submit').addEventListener('click', async () => {
-  const cur = document.getElementById('pw-current').value;
-  const next = document.getElementById('pw-new').value;
-  const msgEl = document.getElementById('pw-msg');
-  const correct = await getStoredPassword();
-  if (cur !== correct) {
-    showMsg(msgEl, 'รหัสผ่านปัจจุบันไม่ถูกต้อง', 'err');
-    return;
-  }
-  if (!next || next.length < 4) {
-    showMsg(msgEl, 'รหัสผ่านใหม่ต้องมีอย่างน้อย 4 ตัวอักษร', 'err');
-    return;
-  }
-  try {
-    await storage.set(PW_KEY, next);
-    showMsg(msgEl, 'เปลี่ยนรหัสผ่านเรียบร้อย', 'ok');
-    document.getElementById('pw-current').value = '';
-    document.getElementById('pw-new').value = '';
-  } catch (e) {
-    showMsg(msgEl, 'บันทึกไม่สำเร็จ กรุณาลองใหม่', 'err');
-  }
 });
 
 document.querySelectorAll('.subtab[data-vtab]').forEach(tab => {
@@ -711,8 +917,9 @@ function showEntryTab(tab) {
   document.querySelectorAll('.subtab[data-etab]').forEach(t => t.classList.toggle('active', t.dataset.etab === tab));
   document.getElementById('epanel-form').style.display = tab === 'form' ? 'block' : 'none';
   document.getElementById('epanel-mine').style.display = tab === 'mine' ? 'block' : 'none';
-  document.getElementById('epanel-pw').style.display = tab === 'pw' ? 'block' : 'none';
+  document.getElementById('epanel-admin').style.display = tab === 'admin' ? 'block' : 'none';
   if (tab === 'mine') loadHistory();
+  if (tab === 'admin') renderAdminPanel();
   if (tab === 'form') updateUntestedReminder();
 }
 document.querySelectorAll('.subtab[data-etab]').forEach(tab => {
@@ -854,6 +1061,9 @@ function updateScore() {
   lastScoreValue = total;
   scoreEl.className = 'score-num ' + (total < 0 ? 'neg' : total < 60 ? 'mid' : 'good');
   updateScoreRing(total);
+  const doneCount = CRITERIA.filter(c => state.selections[c.key]).length;
+  const progEl = document.getElementById('score-progress');
+  if (progEl) progEl.textContent = `คะแนนรวม · เลือกแล้ว ${doneCount}/${CRITERIA.length} หัวข้อ`;
   document.getElementById('score-breakdown').textContent = parts.length ? parts.join(' | ') : 'ยังไม่มีการหักคะแนน';
   return total;
 }
@@ -926,6 +1136,8 @@ function resetFormAfterSave() {
   state.severityPhoto = null;
   state.editingKey = null;
   state.editingSavedAt = null;
+  state.editingInspector = null;
+  state.editingInspectorId = null;
   document.getElementById('grade').disabled = false;
   document.getElementById('room').disabled = false;
   document.getElementById('edit-banner').style.display = 'none';
@@ -945,6 +1157,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const missing = CRITERIA.filter(c => !state.selections[c.key]);
   if (missing.length) {
     showMsg(msgArea, 'กรุณาเลือกระดับให้ครบทุกหัวข้อ: ' + missing.map(m => m.label).join(', '), 'err');
+    msgArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
   const sevEnabled = document.getElementById('severity-enable').checked;
@@ -957,22 +1170,24 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const grade = document.getElementById('grade').value;
   const room = document.getElementById('room').value;
   const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
-  const inspector = document.getElementById('inspector').value.trim();
+  if (!session) { showMsg(msgArea, 'หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่', 'err'); return; }
+  const inspector = isEditing ? (state.editingInspector || '') : session.name;
+  const inspectorId = isEditing ? (state.editingInspectorId || null) : session.id;
   const total = updateScore();
   const record = {
-    grade, room, date, inspector,
+    grade, room, date, inspector, inspectorId,
     selections: { ...state.selections },
     severity: sevEnabled ? { level: state.severityLevel, remark, photo: state.severityPhoto || null } : null,
     total,
     savedAt: isEditing ? state.editingSavedAt : Date.now()
   };
-  if (isEditing) record.editedAt = Date.now();
+  if (isEditing) { record.editedAt = Date.now(); record.editedBy = session.name; }
 
   // แสดงหน้ายืนยันก่อนบันทึกจริง
   const confirmHtml = `
     <button class="modal-close-x" onclick="closeModal()">✕</button>
     <h2>${isEditing ? 'ยืนยันการแก้ไข?' : 'ยืนยันการบันทึก?'}</h2>
-    <div class="modal-sub">ห้อง ${grade}/${room} &middot; วันที่ ${date}${inspector ? ' &middot; ผู้ตรวจ: ' + inspector : ''}</div>
+    <div class="modal-sub">ห้อง ${grade}/${room} &middot; วันที่ ${date}${inspector ? ' &middot; ผู้ตรวจ: ' + esc(inspector) : ''}</div>
     ${buildBreakdownRowsHtml(record)}
     <div class="modal-total-line">
       <span>คะแนนรวม</span>
@@ -1093,12 +1308,24 @@ async function loadLandingSummary() {
   `).join('');
 }
 
+let historyRecordsCache = [];
 async function loadHistory() {
   const container = document.getElementById('history-container');
   container.innerHTML = '<div class="empty">กำลังโหลด...</div>';
   const records = await loadAllRecords();
-  if (!records.length) {
+  historyRecordsCache = records;
+  document.getElementById('history-search').value = '';
+  renderHistoryTable(records);
+}
+
+function renderHistoryTable(records) {
+  const container = document.getElementById('history-container');
+  if (!historyRecordsCache.length) {
     container.innerHTML = '<div class="empty">ยังไม่มีข้อมูลการตรวจ</div>';
+    return;
+  }
+  if (!records.length) {
+    container.innerHTML = '<div class="empty">ไม่พบข้อมูลที่ค้นหา</div>';
     return;
   }
   container.innerHTML = `
@@ -1110,11 +1337,12 @@ async function loadHistory() {
           <tr>
             <td>${r.grade}/${r.room}</td>
             <td>${r.date}</td>
-            <td>${r.inspector || '-'}</td>
+            <td>${esc(r.inspector) || '-'}</td>
             <td class="score-cell" style="color:${scoreColor(r.total)}">${r.total}</td>
             <td style="white-space:nowrap;">
-              <button class="ghost" data-action="edit" data-key="${r.key}">แก้ไข</button>
-              <button class="ghost" data-action="delete" data-key="${r.key}">ลบ</button>
+              ${canModifyRecord(r) ? `
+              <button class="ghost" data-action="edit" data-key="${esc(r.key)}">แก้ไข</button>
+              <button class="ghost" data-action="delete" data-key="${esc(r.key)}">ลบ</button>` : '<span class="lock-note">🔒 ของผู้ตรวจท่านอื่น</span>'}
             </td>
           </tr>
         `).join('')}
@@ -1123,20 +1351,39 @@ async function loadHistory() {
     </div>
   `;
   container.querySelectorAll('button[data-action="delete"]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try {
-        await storage.delete(btn.dataset.key);
+    btn.addEventListener('click', () => {
+      const rec = historyRecordsCache.find(r => r.key === btn.dataset.key);
+      if (!rec || !canModifyRecord(rec)) return;
+      openModal(`
+        <button class="modal-close-x" onclick="closeModal()">✕</button>
+        <h2>ลบผลตรวจนี้?</h2>
+        <div class="modal-sub">ห้อง ${rec.grade}/${rec.room} &middot; วันที่ ${rec.date} &middot; คะแนน ${rec.total}</div>
+        <div class="modal-actions">
+          <button class="ghost" style="flex:1;" onclick="closeModal()">ยกเลิก</button>
+          <button class="primary" id="del-rec-ok" style="flex:1;background:var(--danger);">ลบ</button>
+        </div>`);
+      document.getElementById('del-rec-ok').addEventListener('click', async () => {
+        try { await storage.delete(rec.key); } catch (e) {}
+        closeModal();
         loadHistory();
-      } catch (e) {}
+      });
     });
   });
   container.querySelectorAll('button[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const record = records.find(r => r.key === btn.dataset.key);
-      if (record) startEditRecord(record);
+      const record = historyRecordsCache.find(r => r.key === btn.dataset.key);
+      if (record && canModifyRecord(record)) startEditRecord(record);
     });
   });
 }
+
+document.getElementById('history-search').addEventListener('input', e => {
+  const q = e.target.value.trim().toLowerCase();
+  const filtered = !q ? historyRecordsCache : historyRecordsCache.filter(r =>
+    (r.inspector || '').toLowerCase().includes(q) ||
+    `${r.grade}/${r.room}`.toLowerCase().includes(q));
+  renderHistoryTable(filtered);
+});
 
 // ---------------- แก้ไขข้อมูลที่เคยบันทึกไว้ ----------------
 function startEditRecord(record) {
@@ -1151,7 +1398,8 @@ function startEditRecord(record) {
   document.getElementById('room').value = record.room;
   document.getElementById('room').disabled = true;
   document.getElementById('date').value = record.date;
-  document.getElementById('inspector').value = record.inspector || '';
+  state.editingInspector = record.inspector || '';
+  state.editingInspectorId = record.inspectorId || null;
   updateTeacherHint();
 
   document.querySelectorAll('#criteria-container .level-opt').forEach(opt => {
@@ -1299,12 +1547,14 @@ async function loadDaily() {
     const color = avg === null ? '#6c7f8e' : scoreColor(avg);
     const hlClass = avg === null ? '' : 'hl-' + classifyLevel(avg).cls;
     const teacher = teacherNamesFor(code);
+    const inspNames = recs ? [...new Set(recs.map(r => r.inspector).filter(Boolean))].map(esc).join(', ') : '';
     return `
       <div class="room-chip ${recs ? 'clickable' : ''} ${hlClass}" data-code="${code}">
         <div class="rname">${code}</div>
         ${teacher ? `<div class="rteacher">${teacher}</div>` : ''}
         <div class="rscore" style="color:${color}">${avg === null ? '-' : avg}</div>
         <div class="rdate">${avg === null ? 'ไม่มีการตรวจ' : (recs.length > 1 ? recs.length + ' ครั้ง' : '1 ครั้ง')}</div>
+        ${inspNames ? `<div class="rinsp">👤 ${inspNames}</div>` : ''}
         ${recs ? '<div class="rhint">แตะดูรายละเอียด</div>' : ''}
       </div>
     `;
@@ -1688,6 +1938,7 @@ updateTeacherHint();
 updatePendingBadge();
 flushPendingQueue();
 showPage('page-landing');
+restoreSession();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

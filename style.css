@@ -711,3 +711,38 @@ tr.clickable-row:hover td { color: var(--primary-dark); }
 :root[data-theme="dark"] .weekly-hint { color: var(--text-muted); }
 :root[data-theme="dark"] .issue-tag { background: rgba(255,122,122,0.14); color: #ffb3b3; }
 :root[data-theme="dark"] .issue-tag b { color: #ff8a8a; }
+
+
+/* ===== บัญชีผู้ใช้ / ปรับหน้าตา ===== */
+.login-card { text-align: left; padding: 26px 24px; }
+.login-logo { display: block; width: 64px; height: 64px; object-fit: contain; margin: 0 auto 10px; }
+.login-hint { text-align: center; font-size: 13px; color: var(--text-muted); margin: 0 0 16px; }
+.panel-hint { font-size: 13px; color: var(--text-muted); margin: 0 0 14px; line-height: 1.6; }
+.user-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; color: var(--primary-dark); background: var(--primary-light);
+  border: 1px solid var(--border);
+}
+.inspector-chip {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+  padding: 10px 14px; border-radius: 12px; background: var(--primary-light); border: 1px solid var(--border);
+}
+.inspector-chip .ic-label { font-size: 12px; color: var(--text-muted); }
+.inspector-chip b { font-size: 15px; color: var(--primary-dark); }
+.inspector-chip .ic-note { font-size: 11.5px; color: var(--text-muted); margin-left: auto; }
+.lock-note { font-size: 11.5px; color: var(--text-muted); }
+.room-chip .rinsp { font-size: 10.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.3; word-break: break-word; }
+.app > div[id^="page-"] { animation: fadeUp 0.3s ease; }
+button:focus-visible, .subtab:focus-visible, .level-opt:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+.card h2 { margin-top: 0; }
+@media (max-width: 640px) {
+  button.ghost { min-height: 38px; }
+  button.primary { min-height: 46px; }
+  .topbar .row { width: 100%; }
+  .topbar .row button.ghost { flex: 1; }
+  .inspector-chip .ic-note { margin-left: 0; width: 100%; }
+}
+:root[data-theme="dark"] .user-chip,
+:root[data-theme="dark"] .inspector-chip { background: rgba(79,168,232,0.14); color: var(--text); }
+:root[data-theme="dark"] .inspector-chip b,
+:root[data-theme="dark"] .user-chip { color: var(--sky); }

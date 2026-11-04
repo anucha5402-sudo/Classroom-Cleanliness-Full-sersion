@@ -1,4 +1,4 @@
-const CACHE_NAME = 'classroom-recap-v1';
+const CACHE_NAME = 'classroom-recap-v2';
 const APP_SHELL = [
   './',
   './index.html',

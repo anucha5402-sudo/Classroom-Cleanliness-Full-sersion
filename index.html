@@ -61,10 +61,12 @@
 
   <div id="page-login" style="display:none;">
     <div class="card login-card">
-      <h2>เข้าสู่ระบบผู้ตรวจ</h2>
+      <img class="login-logo" src="assets/logo-school.png" alt="ตราโรงเรียน">
+      <h2 style="text-align:center;margin-bottom:4px;">เข้าสู่ระบบผู้ตรวจ</h2>
+      <p class="login-hint">ใส่รหัสผ่านของคุณ ระบบจะรู้เองว่าคุณคือใคร</p>
       <label>รหัสผ่าน</label>
       <div class="password-wrap">
-        <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน">
+        <input type="password" id="login-password" placeholder="กรอกรหัสผ่าน" autocomplete="current-password">
         <button type="button" class="pw-toggle" data-target="login-password">👁</button>
       </div>
       <div id="login-msg" style="margin-top:10px;"></div>
@@ -144,6 +146,7 @@
     <div class="topbar">
       <h1 style="margin:0;">กรอกข้อมูลการตรวจ</h1>
       <div class="row" style="gap:8px;">
+        <span id="user-chip" class="user-chip"></span>
         <span id="conn-badge-entry"></span>
         <span id="pending-badge" class="conn-badge offline" style="display:none;"></span>
         <button class="ghost" id="entry-view-criteria">ℹ️ เกณฑ์คะแนน</button>
@@ -155,7 +158,7 @@
     <div class="subtabs">
       <button class="subtab active" data-etab="form">กรอกข้อมูล</button>
       <button class="subtab" data-etab="mine">ประวัติ / จัดการ</button>
-      <button class="subtab" data-etab="pw">เปลี่ยนรหัสผ่าน</button>
+      <button class="subtab" data-etab="admin" id="tab-admin" style="display:none;">จัดการผู้ตรวจ</button>
     </div>
 
     <div id="epanel-form">
@@ -165,6 +168,7 @@
       </div>
       <div id="untested-reminder" class="untested-reminder" style="display:none;"></div>
       <div class="card">
+        <div class="inspector-chip" id="inspector-chip"></div>
         <div class="row">
           <div class="field">
             <label>ระดับชั้น</label>
@@ -181,10 +185,6 @@
             <label>วันที่ตรวจ</label>
             <input type="date" id="date">
           </div>
-          <div class="field">
-            <label>ผู้ตรวจ (ถ้ามี)</label>
-            <input type="text" id="inspector" placeholder="ชื่อผู้ตรวจ">
-          </div>
         </div>
         <div id="teacher-hint" class="teacher-hint"></div>
       </div>
@@ -197,7 +197,7 @@
             </div>
           </div>
           <div>
-            <div class="score-label">คะแนนรวม</div>
+            <div class="score-label" id="score-progress">คะแนนรวม</div>
             <div class="breakdown" id="score-breakdown"></div>
           </div>
         </div>
@@ -229,22 +229,48 @@
         <span style="font-size:13px; color:var(--text-muted);">ส่งออกข้อมูลทั้งหมดเป็นไฟล์ CSV (เปิดใน Excel ได้)</span>
         <button class="ghost" id="export-csv-btn">📥 ส่งออก CSV</button>
       </div>
+      <div class="card">
+        <input type="text" id="history-search" placeholder="🔍 ค้นหาตามชื่อผู้ตรวจ หรือห้อง (เช่น ม.3/1)">
+      </div>
       <div class="card" id="history-container">
         <div class="empty">กำลังโหลด...</div>
       </div>
     </div>
 
-    <div id="epanel-pw" style="display:none;">
-      <div class="card" style="max-width:360px;">
-        <h2>เปลี่ยนรหัสผ่านผู้ตรวจ</h2>
+    <div id="epanel-admin" style="display:none;">
+      <div class="card">
+        <h2>เพิ่มบัญชีผู้ตรวจ</h2>
+        <p class="panel-hint">ผู้ตรวจแต่ละคนใช้รหัสผ่านของตัวเองเข้าระบบ ชื่อที่ตั้งไว้จะถูกบันทึกในผลตรวจทุกครั้งโดยอัตโนมัติ (แก้ไม่ได้) รหัสผ่านของแต่ละคนต้องไม่ซ้ำกัน</p>
+        <div class="row">
+          <div class="field">
+            <label>ชื่อผู้ตรวจ</label>
+            <input type="text" id="ins-name" placeholder="เช่น นายสมชาย ใจดี" maxlength="40" autocomplete="off">
+          </div>
+          <div class="field">
+            <label>รหัสผ่าน (อย่างน้อย 4 ตัว)</label>
+            <div class="password-wrap">
+              <input type="password" id="ins-pw" autocomplete="new-password">
+              <button type="button" class="pw-toggle" data-target="ins-pw">👁</button>
+            </div>
+          </div>
+        </div>
+        <div id="ins-msg" style="margin-top:10px;"></div>
+        <button class="primary" id="ins-add" style="margin-top:12px;">+ เพิ่มบัญชี</button>
+      </div>
+      <div class="card">
+        <h2>บัญชีผู้ตรวจทั้งหมด</h2>
+        <div id="ins-list"><div class="empty">กำลังโหลด...</div></div>
+      </div>
+      <div class="card" style="max-width:420px;">
+        <h2>เปลี่ยนรหัสผ่านผู้ดูแล</h2>
         <label>รหัสผ่านปัจจุบัน</label>
         <div class="password-wrap">
-          <input type="password" id="pw-current">
+          <input type="password" id="pw-current" autocomplete="current-password">
           <button type="button" class="pw-toggle" data-target="pw-current">👁</button>
         </div>
         <label style="margin-top:10px;">รหัสผ่านใหม่</label>
         <div class="password-wrap">
-          <input type="password" id="pw-new">
+          <input type="password" id="pw-new" autocomplete="new-password">
           <button type="button" class="pw-toggle" data-target="pw-new">👁</button>
         </div>
         <div id="pw-msg" style="margin-top:10px;"></div>
