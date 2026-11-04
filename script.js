@@ -249,7 +249,7 @@ function showPage(id) {
   ['page-landing','page-login','page-viewer','page-entry'].forEach(p => {
     document.getElementById(p).style.display = (p === id) ? 'block' : 'none';
   });
-  if (id === 'page-landing') loadLandingSummary();
+  if (id === 'page-landing') { loadLandingSummary(); loadLandingRoster(); }
 }
 
 function animateNumber(el, from, to, duration) {
@@ -379,7 +379,7 @@ function buildRecordBlockHtml(record) {
   return `
     <div class="modal-record-block">
       <div class="modal-record-meta">
-        ${record.date} ${record.inspector ? '&middot; ผู้ตรวจ: ' + esc(record.inspector) : ''}
+        ${record.date} ${record.inspector ? '&middot; ผู้ตรวจ: ' + esc(record.inspector) : ''}${record.substitute ? ' <span class="sub-badge">แทน' + (record.substituteFor && record.substituteFor.length ? ' ' + record.substituteFor.map(esc).join(', ') : '') + '</span>' : ''}
       </div>
       ${buildBreakdownRowsHtml(record)}
       <div class="modal-total-line">
@@ -716,7 +716,111 @@ function enterEntryPage() {
   document.getElementById('tab-admin').style.display = session.role === 'admin' ? '' : 'none';
   showPage('page-entry');
   showEntryTab('form');
+  updateDutyToday();
 }
+
+// ---------------- ตารางเวรผู้ตรวจ (กำหนดเอง จันทร์-ศุกร์) ----------------
+const ROSTER_KEY = 'duty-roster';
+const DAY_NAMES = { 1: 'จันทร์', 2: 'อังคาร', 3: 'พุธ', 4: 'พฤหัสบดี', 5: 'ศุกร์' };
+
+async function loadRoster() {
+  try {
+    const v = await getVal(ROSTER_KEY);
+    return v ? JSON.parse(v) : {};
+  } catch (e) { return {}; }
+}
+
+function rosterNames(roster, day, inspectors) {
+  const ids = roster[day] || [];
+  return inspectors.filter(i => ids.includes(i.id)).map(i => i.name);
+}
+
+function rosterTableHtml(roster, inspectors, today) {
+  return `<div class="table-scroll"><table class="roster-table"><tbody>${[1,2,3,4,5].map(d => {
+    const n = rosterNames(roster, d, inspectors);
+    return `<tr${d === today ? ' class="today-row"' : ''}>
+      <td class="rt-day">${DAY_NAMES[d]}${d === today ? ' <span class="today-tag">วันนี้</span>' : ''}</td>
+      <td>${n.length ? n.map(esc).join(', ') : '<span class="hr-none">-</span>'}</td></tr>`;
+  }).join('')}</tbody></table></div>`;
+}
+
+async function loadLandingRoster() {
+  const card = document.getElementById('landing-roster-card');
+  if (!card) return;
+  try {
+    const [inspectors, roster] = await Promise.all([listInspectors(), loadRoster()]);
+    const any = [1,2,3,4,5].some(d => rosterNames(roster, d, inspectors).length);
+    if (!any) { card.style.display = 'none'; return; }
+    document.getElementById('landing-roster-body').innerHTML = rosterTableHtml(roster, inspectors, new Date().getDay());
+    card.style.display = '';
+  } catch (e) { card.style.display = 'none'; }
+}
+
+// วันนั้นมีเวรกำหนดไว้ และผู้ตรวจคนนี้ไม่ได้อยู่เวร → ถือว่าตรวจแทน
+function dutyInfoFor(dateStr, roster, inspectors, user) {
+  const day = new Date(dateStr + 'T00:00:00').getDay();
+  if (day < 1 || day > 5) return { substitute: false, onDuty: [] };
+  const onDuty = rosterNames(roster, day, inspectors);
+  const ids = roster[day] || [];
+  const substitute = !!user && user.role === 'inspector' && onDuty.length > 0 && !ids.includes(user.id);
+  return { substitute, onDuty };
+}
+
+async function updateDutyToday() {
+  const box = document.getElementById('duty-today');
+  if (!box) return;
+  const day = new Date().getDay();
+  if (day < 1 || day > 5) {
+    box.innerHTML = '<span>📅 วันนี้เป็นวันหยุด ไม่มีเวรตรวจ</span>';
+    return;
+  }
+  let inspectors = [], roster = {};
+  try { [inspectors, roster] = await Promise.all([listInspectors(), loadRoster()]); } catch (e) {}
+  const names = rosterNames(roster, day, inspectors);
+  const info = dutyInfoFor(new Date().toISOString().slice(0, 10), roster, inspectors, session);
+  box.innerHTML = `<span>📅 <b>เวรวัน${DAY_NAMES[day]}:</b> ${names.length ? names.map(esc).join(', ') : 'ยังไม่ได้กำหนดเวร'}
+    ${info.substitute ? '<br><small class="sub-note">วันนี้คุณไม่ได้อยู่เวร ตรวจแทนได้ ระบบจะบันทึกว่า "แทน"</small>' : ''}</span>
+    <button class="ghost" id="duty-week-btn">ดูทั้งสัปดาห์</button>`;
+  document.getElementById('duty-week-btn').addEventListener('click', () => {
+    openModal(`
+      <button class="modal-close-x" onclick="closeModal()">✕</button>
+      <h2>ตารางเวรผู้ตรวจ</h2>
+      ${rosterTableHtml(roster, inspectors, day)}
+      <button class="primary" style="width:100%;margin-top:14px;" onclick="closeModal()">ปิด</button>`);
+  });
+}
+
+function renderRosterEditor(inspectors, roster) {
+  const box = document.getElementById('roster-editor');
+  if (!inspectors.length) {
+    box.innerHTML = '<div class="empty">เพิ่มบัญชีผู้ตรวจก่อน แล้วค่อยจัดเวร</div>';
+    return;
+  }
+  box.innerHTML = [1,2,3,4,5].map(d => `
+    <div class="roster-day">
+      <div class="roster-day-name">${DAY_NAMES[d]}</div>
+      <div class="roster-chips">
+        ${inspectors.map(i => `
+          <label class="roster-chip">
+            <input type="checkbox" data-day="${d}" value="${esc(i.id)}" ${(roster[d] || []).includes(i.id) ? 'checked' : ''}>
+            <span>${esc(i.name)}</span>
+          </label>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+document.getElementById('roster-save').addEventListener('click', async () => {
+  const msg = document.getElementById('roster-msg');
+  const roster = {};
+  [1,2,3,4,5].forEach(d => {
+    roster[d] = Array.from(document.querySelectorAll(`#roster-editor input[data-day="${d}"]:checked`)).map(i => i.value);
+  });
+  try {
+    await storage.set(ROSTER_KEY, JSON.stringify(roster));
+    showMsg(msg, 'บันทึกตารางเวรเรียบร้อย', 'ok');
+    updateDutyToday();
+  } catch (e) { showMsg(msg, 'บันทึกไม่สำเร็จ ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่', 'err'); }
+});
 
 function canModifyRecord(r) {
   return !!session && (session.role === 'admin' || (r.inspectorId && r.inspectorId === session.id));
@@ -792,6 +896,7 @@ async function renderAdminPanel() {
   let list;
   try { list = await listInspectors(); }
   catch (e) { box.innerHTML = '<div class="empty">โหลดข้อมูลไม่สำเร็จ</div>'; return; }
+  loadRoster().then(r => renderRosterEditor(list, r));
   if (!list.length) { box.innerHTML = '<div class="empty">ยังไม่มีบัญชีผู้ตรวจ เพิ่มได้จากด้านบน</div>'; return; }
   box.innerHTML = `
     <div class="table-scroll"><table>
@@ -1138,6 +1243,8 @@ function resetFormAfterSave() {
   state.editingSavedAt = null;
   state.editingInspector = null;
   state.editingInspectorId = null;
+  state.editingSub = false;
+  state.editingSubFor = [];
   document.getElementById('grade').disabled = false;
   document.getElementById('room').disabled = false;
   document.getElementById('edit-banner').style.display = 'none';
@@ -1173,9 +1280,19 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   if (!session) { showMsg(msgArea, 'หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่', 'err'); return; }
   const inspector = isEditing ? (state.editingInspector || '') : session.name;
   const inspectorId = isEditing ? (state.editingInspectorId || null) : session.id;
+  let substitute = isEditing ? !!state.editingSub : false;
+  let substituteFor = isEditing ? (state.editingSubFor || []) : [];
+  if (!isEditing) {
+    try {
+      const [insps, roster] = await Promise.all([listInspectors(), loadRoster()]);
+      const info = dutyInfoFor(date, roster, insps, session);
+      substitute = info.substitute;
+      substituteFor = info.substitute ? info.onDuty : [];
+    } catch (e) {}
+  }
   const total = updateScore();
   const record = {
-    grade, room, date, inspector, inspectorId,
+    grade, room, date, inspector, inspectorId, substitute, substituteFor,
     selections: { ...state.selections },
     severity: sevEnabled ? { level: state.severityLevel, remark, photo: state.severityPhoto || null } : null,
     total,
@@ -1188,6 +1305,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     <button class="modal-close-x" onclick="closeModal()">✕</button>
     <h2>${isEditing ? 'ยืนยันการแก้ไข?' : 'ยืนยันการบันทึก?'}</h2>
     <div class="modal-sub">ห้อง ${grade}/${room} &middot; วันที่ ${date}${inspector ? ' &middot; ผู้ตรวจ: ' + esc(inspector) : ''}</div>
+    ${substitute ? `<div class="sub-confirm">⚠️ คุณไม่ได้อยู่เวรวันนี้ (เวร: ${substituteFor.map(esc).join(', ')}) ระบบจะบันทึกว่า <b>ตรวจแทน</b></div>` : ''}
     ${buildBreakdownRowsHtml(record)}
     <div class="modal-total-line">
       <span>คะแนนรวม</span>
@@ -1315,10 +1433,17 @@ async function loadHistory() {
   const records = await loadAllRecords();
   historyRecordsCache = records;
   document.getElementById('history-search').value = '';
+  document.getElementById('history-date').value = '';
   renderHistoryTable(records);
 }
 
-function renderHistoryTable(records) {
+function formatThaiDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function renderHistoryTable(records, expandAll) {
   const container = document.getElementById('history-container');
   if (!historyRecordsCache.length) {
     container.innerHTML = '<div class="empty">ยังไม่มีข้อมูลการตรวจ</div>';
@@ -1328,28 +1453,36 @@ function renderHistoryTable(records) {
     container.innerHTML = '<div class="empty">ไม่พบข้อมูลที่ค้นหา</div>';
     return;
   }
-  container.innerHTML = `
-    <div class="table-scroll">
-    <table>
-      <thead><tr><th>ห้อง</th><th>วันที่</th><th>ผู้ตรวจ</th><th>คะแนน</th><th></th></tr></thead>
-      <tbody>
-        ${records.map(r => `
-          <tr>
-            <td>${r.grade}/${r.room}</td>
-            <td>${r.date}</td>
-            <td>${esc(r.inspector) || '-'}</td>
-            <td class="score-cell" style="color:${scoreColor(r.total)}">${r.total}</td>
-            <td style="white-space:nowrap;">
+  const byDate = {};
+  records.forEach(r => { (byDate[r.date] = byDate[r.date] || []).push(r); });
+  const dates = Object.keys(byDate).sort().reverse();
+  const roomIdx = r => ROOM_CODES.indexOf(`${r.grade}/${r.room}`);
+
+  container.innerHTML = dates.map((date, idx) => {
+    const recs = byDate[date].slice().sort((a, b) => roomIdx(a) - roomIdx(b));
+    const avg = Math.round(recs.reduce((t, r) => t + r.total, 0) / recs.length);
+    return `
+    <details class="hist-day" ${(expandAll || idx < 2) ? 'open' : ''}>
+      <summary>
+        <span class="hd-date">${formatThaiDate(date)}</span>
+        <span class="hd-meta">${recs.length} ห้อง · เฉลี่ย <b style="color:${scoreColor(avg)}">${avg}</b></span>
+      </summary>
+      <div class="hist-rows">
+        ${recs.map(r => `
+          <div class="hist-row">
+            <div class="hr-room">${r.grade}/${r.room}</div>
+            <div class="hr-insp">${r.inspector ? '👤 ' + esc(r.inspector) : '<span class="hr-none">ไม่ระบุผู้ตรวจ</span>'}${r.substitute ? ` <span class="sub-badge" title="แทนเวร: ${esc((r.substituteFor || []).join(', '))}">แทน</span>` : ''}</div>
+            <div class="hr-score" style="color:${scoreColor(r.total)}">${r.total}</div>
+            <div class="hr-actions">
               ${canModifyRecord(r) ? `
               <button class="ghost" data-action="edit" data-key="${esc(r.key)}">แก้ไข</button>
-              <button class="ghost" data-action="delete" data-key="${esc(r.key)}">ลบ</button>` : '<span class="lock-note">🔒 ของผู้ตรวจท่านอื่น</span>'}
-            </td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-    </div>
-  `;
+              <button class="ghost" data-action="delete" data-key="${esc(r.key)}">ลบ</button>` : '<span class="lock-note">🔒</span>'}
+            </div>
+          </div>`).join('')}
+      </div>
+    </details>`;
+  }).join('');
+
   container.querySelectorAll('button[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const rec = historyRecordsCache.find(r => r.key === btn.dataset.key);
@@ -1377,12 +1510,20 @@ function renderHistoryTable(records) {
   });
 }
 
-document.getElementById('history-search').addEventListener('input', e => {
-  const q = e.target.value.trim().toLowerCase();
-  const filtered = !q ? historyRecordsCache : historyRecordsCache.filter(r =>
-    (r.inspector || '').toLowerCase().includes(q) ||
-    `${r.grade}/${r.room}`.toLowerCase().includes(q));
-  renderHistoryTable(filtered);
+function applyHistoryFilter() {
+  const q = document.getElementById('history-search').value.trim().toLowerCase();
+  const date = document.getElementById('history-date').value;
+  const filtered = historyRecordsCache.filter(r =>
+    (!date || r.date === date) &&
+    (!q || (r.inspector || '').toLowerCase().includes(q) || `${r.grade}/${r.room}`.toLowerCase().includes(q)));
+  renderHistoryTable(filtered, !!(q || date));
+}
+document.getElementById('history-search').addEventListener('input', applyHistoryFilter);
+document.getElementById('history-date').addEventListener('change', applyHistoryFilter);
+document.getElementById('history-clear').addEventListener('click', () => {
+  document.getElementById('history-search').value = '';
+  document.getElementById('history-date').value = '';
+  applyHistoryFilter();
 });
 
 // ---------------- แก้ไขข้อมูลที่เคยบันทึกไว้ ----------------
@@ -1399,6 +1540,8 @@ function startEditRecord(record) {
   document.getElementById('room').disabled = true;
   document.getElementById('date').value = record.date;
   state.editingInspector = record.inspector || '';
+  state.editingSub = !!record.substitute;
+  state.editingSubFor = record.substituteFor || [];
   state.editingInspectorId = record.inspectorId || null;
   updateTeacherHint();
 
@@ -1547,7 +1690,7 @@ async function loadDaily() {
     const color = avg === null ? '#6c7f8e' : scoreColor(avg);
     const hlClass = avg === null ? '' : 'hl-' + classifyLevel(avg).cls;
     const teacher = teacherNamesFor(code);
-    const inspNames = recs ? [...new Set(recs.map(r => r.inspector).filter(Boolean))].map(esc).join(', ') : '';
+    const inspNames = recs ? [...new Set(recs.map(r => r.inspector ? r.inspector + (r.substitute ? ' (แทน)' : '') : '').filter(Boolean))].map(esc).join(', ') : '';
     return `
       <div class="room-chip ${recs ? 'clickable' : ''} ${hlClass}" data-code="${code}">
         <div class="rname">${code}</div>
@@ -1878,7 +2021,7 @@ document.getElementById('export-csv-btn').addEventListener('click', async () => 
   btn.disabled = true;
   try {
     const records = (await loadAllRecords()).slice().sort((a, b) => a.savedAt - b.savedAt);
-    const headers = ['วันที่', 'ห้อง', 'ครูประจำชั้น', 'ผู้ตรวจ', ...CRITERIA.map(c => c.label), 'กรณีพิเศษ', 'คะแนนรวม'];
+    const headers = ['วันที่', 'ห้อง', 'ครูประจำชั้น', 'ผู้ตรวจ', 'ตรวจแทน', ...CRITERIA.map(c => c.label), 'กรณีพิเศษ', 'คะแนนรวม'];
     const rows = records.map(r => {
       const code = `${r.grade}/${r.room}`;
       const critVals = CRITERIA.map(c => {
@@ -1890,7 +2033,7 @@ document.getElementById('export-csv-btn').addEventListener('click', async () => 
         const sev = SEVERITY.find(s => s.value === r.severity.level);
         sevVal = (sev ? sev.label : '') + (r.severity.remark ? ' - ' + r.severity.remark : '');
       }
-      return [r.date, code, teacherNamesFor(code), r.inspector || '', ...critVals, sevVal, r.total];
+      return [r.date, code, teacherNamesFor(code), r.inspector || '', r.substitute ? 'แทน ' + (r.substituteFor || []).join('/') : '', ...critVals, sevVal, r.total];
     });
     const csvContent = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });

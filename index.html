@@ -51,6 +51,11 @@
       <div id="landing-rank-list"></div>
     </div>
 
+    <div class="card roster-card" id="landing-roster-card" style="display:none;">
+      <div class="summary-card-title">📅 ตารางเวรผู้ตรวจ</div>
+      <div id="landing-roster-body"></div>
+    </div>
+
     <button class="donate-link" id="btn-donate">🍪 บริจาคช่วยโรงเรียน</button>
     <button class="donate-link" id="btn-view-criteria-landing" style="margin-top:8px;">ℹ️ ดูเกณฑ์การให้คะแนน</button>
   </div>
@@ -164,6 +169,7 @@
       </div>
       <div id="untested-reminder" class="untested-reminder" style="display:none;"></div>
       <div class="card">
+        <div class="duty-today" id="duty-today"></div>
         <div class="inspector-chip" id="inspector-chip"></div>
         <div class="row">
           <div class="field">
@@ -225,8 +231,12 @@
         <span style="font-size:13px; color:var(--text-muted);">ส่งออกข้อมูลทั้งหมดเป็นไฟล์ CSV (เปิดใน Excel ได้)</span>
         <button class="ghost" id="export-csv-btn">📥 ส่งออก CSV</button>
       </div>
-      <div class="card">
-        <input type="text" id="history-search" placeholder="🔍 ค้นหาตามชื่อผู้ตรวจ หรือห้อง (เช่น ม.3/1)">
+      <div class="card hist-filter">
+        <input type="text" id="history-search" placeholder="🔍 ค้นหาชื่อผู้ตรวจ หรือห้อง (เช่น ม.3/1)">
+        <div class="hist-date-row">
+          <input type="date" id="history-date" aria-label="กรองตามวันที่">
+          <button class="ghost" id="history-clear">ล้างตัวกรอง</button>
+        </div>
       </div>
       <div class="card" id="history-container">
         <div class="empty">กำลังโหลด...</div>
@@ -252,6 +262,13 @@
         </div>
         <div id="ins-msg" style="margin-top:10px;"></div>
         <button class="primary" id="ins-add" style="margin-top:12px;">+ เพิ่มบัญชี</button>
+      </div>
+      <div class="card">
+        <h2>ตารางเวรผู้ตรวจ (จันทร์ - ศุกร์)</h2>
+        <p class="panel-hint">ติ๊กเลือกผู้ตรวจที่อยู่เวรในแต่ละวัน (วันละกี่คนก็ได้) แล้วกดบันทึก ตารางนี้ใช้ซ้ำทุกสัปดาห์ และจะแสดงให้ผู้ตรวจเห็นในหน้ากรอกข้อมูล</p>
+        <div id="roster-editor"><div class="empty">กำลังโหลด...</div></div>
+        <div id="roster-msg" style="margin-top:10px;"></div>
+        <button class="primary" id="roster-save" style="margin-top:12px;">บันทึกตารางเวร</button>
       </div>
       <div class="card">
         <h2>บัญชีผู้ตรวจทั้งหมด</h2>
