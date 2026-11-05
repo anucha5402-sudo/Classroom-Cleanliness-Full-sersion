@@ -900,17 +900,28 @@ async function renderAdminPanel() {
   if (!list.length) { box.innerHTML = '<div class="empty">ยังไม่มีบัญชีผู้ตรวจ เพิ่มได้จากด้านบน</div>'; return; }
   box.innerHTML = `
     <div class="table-scroll"><table>
-      <thead><tr><th>ชื่อผู้ตรวจ</th><th>สร้างเมื่อ</th><th></th></tr></thead>
+      <thead><tr><th>ชื่อผู้ตรวจ</th><th>รหัสผ่าน</th><th></th></tr></thead>
       <tbody>${list.map(i => `
         <tr>
-          <td><b>${esc(i.name)}</b></td>
-          <td>${i.createdAt ? new Date(i.createdAt).toLocaleDateString('th-TH') : '-'}</td>
+          <td><b>${esc(i.name)}</b><div class="ins-date">สร้างเมื่อ ${i.createdAt ? new Date(i.createdAt).toLocaleDateString('th-TH') : '-'}</div></td>
+          <td>${i.pw
+            ? `<span class="pw-cell"><code class="pw-text" data-pw="${esc(i.pw)}">••••••</code><button class="ghost pw-peek" data-id="${esc(i.id)}" title="แสดง/ซ่อนรหัส">👁</button></span>`
+            : '<span class="hr-none">ดูไม่ได้<br>ตั้งรหัสใหม่</span>'}</td>
           <td style="white-space:nowrap;">
             <button class="ghost" data-act="reset" data-id="${esc(i.id)}">เปลี่ยนรหัส</button>
             <button class="ghost" data-act="del" data-id="${esc(i.id)}">ลบ</button>
           </td>
         </tr>`).join('')}
       </tbody></table></div>`;
+  box.querySelectorAll('.pw-peek').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const code = btn.parentElement.querySelector('.pw-text');
+      const shown = code.dataset.shown === '1';
+      code.textContent = shown ? '••••••' : code.dataset.pw;
+      code.dataset.shown = shown ? '0' : '1';
+      btn.textContent = shown ? '👁' : '🙈';
+    });
+  });
   box.querySelectorAll('button[data-act]').forEach(btn => {
     btn.addEventListener('click', () => {
       const ins = list.find(x => x.id === btn.dataset.id);
@@ -955,7 +966,7 @@ function openResetInspectorModal(ins) {
     if (bad) { showMsg(msg, bad, 'err'); return; }
     try {
       if (await passwordInUse(pw, ins.id)) { showMsg(msg, 'รหัสผ่านนี้มีคนใช้อยู่แล้ว ลองรหัสอื่น', 'err'); return; }
-      await storage.set(INSPECTOR_PREFIX + ins.id, JSON.stringify({ ...ins, hash: await hashPassword(pw) }));
+      await storage.set(INSPECTOR_PREFIX + ins.id, JSON.stringify({ ...ins, hash: await hashPassword(pw), pw }));
       closeModal();
       renderAdminPanel();
     } catch (e) { showMsg(msg, 'บันทึกไม่สำเร็จ กรุณาลองใหม่', 'err'); }
@@ -974,7 +985,7 @@ document.getElementById('ins-add').addEventListener('click', async () => {
     if (list.some(i => i.name.toLowerCase() === name.toLowerCase())) { showMsg(msg, 'มีชื่อนี้ในระบบแล้ว', 'err'); return; }
     if (await passwordInUse(pw)) { showMsg(msg, 'รหัสผ่านนี้มีคนใช้อยู่แล้ว ลองรหัสอื่น', 'err'); return; }
     const id = 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    await storage.set(INSPECTOR_PREFIX + id, JSON.stringify({ id, name, hash: await hashPassword(pw), createdAt: Date.now() }));
+    await storage.set(INSPECTOR_PREFIX + id, JSON.stringify({ id, name, hash: await hashPassword(pw), pw, createdAt: Date.now() }));
     document.getElementById('ins-name').value = '';
     document.getElementById('ins-pw').value = '';
     showMsg(msg, `เพิ่มบัญชี "${esc(name)}" เรียบร้อย`, 'ok');
