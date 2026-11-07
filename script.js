@@ -104,6 +104,14 @@ const localAdapter = {
       if (!prefix || k.startsWith(prefix)) keys.push(k);
     }
     return { keys, prefix };
+  },
+  async listDocs(prefix) {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k.startsWith(prefix)) out.push({ key: k, value: localStorage.getItem(k) });
+    }
+    return out;
   }
 };
 
@@ -126,13 +134,35 @@ const firebaseAdapter = {
     const keys = [];
     snapshot.forEach(doc => { if (!prefix || doc.id.startsWith(prefix)) keys.push(doc.id); });
     return { keys, prefix };
+  },
+  // ดึงเอกสารทั้งกลุ่มที่ขึ้นต้นด้วย prefix ใน "ครั้งเดียว" (เร็วกว่าดึงทีละอัน)
+  async listDocs(prefix) {
+    const snap = await db.collection('data')
+      .orderBy(firebase.firestore.FieldPath.documentId())
+      .startAt(prefix).endAt(prefix + '\uf8ff').get();
+    const out = [];
+    snap.forEach(doc => { const d = doc.data(); out.push({ key: doc.id, value: d.value }); });
+    return out;
   }
 };
 
+// แคชในหน่วยความจำ: เปิดหน้าซ้ำ/สลับแท็บไม่ต้องโหลดใหม่ทุกครั้ง (หมดอายุเอง 20 วินาที และล้างทันทีเมื่อมีการบันทึก/ลบ)
+const DOC_CACHE_TTL = 20000;
+const docCache = {};
+function invalidateDocCache() { Object.keys(docCache).forEach(k => delete docCache[k]); }
+function cachedListDocs(prefix, fresh) {
+  const c = docCache[prefix];
+  if (!fresh && c && Date.now() - c.t < DOC_CACHE_TTL) return c.promise;
+  const promise = (USE_FIREBASE ? firebaseAdapter : localAdapter).listDocs(prefix);
+  docCache[prefix] = { t: Date.now(), promise };
+  promise.catch(() => { if (docCache[prefix] && docCache[prefix].promise === promise) delete docCache[prefix]; });
+  return promise;
+}
+
 const storage = {
   get: (...args) => (USE_FIREBASE ? firebaseAdapter : localAdapter).get(...args),
-  set: (...args) => (USE_FIREBASE ? firebaseAdapter : localAdapter).set(...args),
-  delete: (...args) => (USE_FIREBASE ? firebaseAdapter : localAdapter).delete(...args),
+  set: (...args) => { invalidateDocCache(); return (USE_FIREBASE ? firebaseAdapter : localAdapter).set(...args).finally(invalidateDocCache); },
+  delete: (...args) => { invalidateDocCache(); return (USE_FIREBASE ? firebaseAdapter : localAdapter).delete(...args).finally(invalidateDocCache); },
   list: (...args) => (USE_FIREBASE ? firebaseAdapter : localAdapter).list(...args)
 };
 
@@ -688,15 +718,10 @@ async function getAdminHash() {
   return h;
 }
 
-async function listInspectors() {
-  const res = await storage.list(INSPECTOR_PREFIX);
+async function listInspectors(fresh) {
+  const docs = await cachedListDocs(INSPECTOR_PREFIX, fresh);
   const out = [];
-  for (const k of (res ? res.keys : [])) {
-    try {
-      const v = await getVal(k);
-      if (v) out.push(JSON.parse(v));
-    } catch (e) {}
-  }
+  docs.forEach(d => { try { if (d.value) out.push(JSON.parse(d.value)); } catch (e) {} });
   out.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
   return out;
 }
@@ -705,7 +730,7 @@ async function listInspectors() {
 async function authenticate(pw) {
   const h = await hashPassword(pw);
   if (h === await getAdminHash()) return { role: 'admin', id: 'admin', name: 'ผู้ดูแลระบบ' };
-  const m = (await listInspectors()).find(i => i.hash === h);
+  const m = (await listInspectors(true)).find(i => i.hash === h);
   return m ? { role: 'inspector', id: m.id, name: m.name } : null;
 }
 
@@ -1376,15 +1401,9 @@ document.getElementById('save-btn').addEventListener('click', async () => {
 // ==========================================================================
 async function loadAllRecords() {
   try {
-    const listRes = await storage.list('eval:');
-    const keys = listRes ? listRes.keys : [];
+    const docs = await cachedListDocs('eval:');
     const records = [];
-    for (const k of keys) {
-      try {
-        const r = await storage.get(k);
-        if (r) records.push({ key: k, ...JSON.parse(r.value) });
-      } catch (e) {}
-    }
+    docs.forEach(d => { try { records.push({ key: d.key, ...JSON.parse(d.value) }); } catch (e) {} });
     records.sort((a, b) => b.savedAt - a.savedAt);
     return records;
   } catch (e) {
