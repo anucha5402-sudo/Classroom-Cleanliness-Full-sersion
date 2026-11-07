@@ -1011,3 +1011,12 @@ button.pw-peek { min-height: 34px; padding: 4px 8px; font-size: 15px; }
 .topbar h1 { padding-right: 0; }
 .subtab { min-width: 0; white-space: normal; line-height: 1.25; }
 @media (max-width: 400px) { .subtab { font-size: 13.5px; padding: 10px 4px; } }
+
+/* ช่องวันที่ (กันบั๊ก iPhone/Safari ที่ช่อง date สูงและล้นไปทับปุ่ม) */
+.day-nav-input { position: relative; min-width: 0; height: 48px; overflow: hidden; border-radius: 10px; }
+.day-nav-row .day-nav-input input[type=date] {
+  position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0; margin: 0;
+  -webkit-appearance: none; appearance: none; padding: 0 10px; line-height: 46px; text-align: center; display: block;
+}
+.day-nav-input input[type=date]::-webkit-date-and-time-value { text-align: center; min-width: 0; margin: 0; }
+.day-nav-input input[type=date]::-webkit-calendar-picker-indicator { margin: 0 0 0 4px; }
