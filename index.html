@@ -93,15 +93,14 @@
     </div>
 
     <div id="vpanel-daily">
-      <div class="card">
-        <div class="row" style="align-items:flex-end;">
-          <button class="ghost" id="daily-prev-day" title="วันก่อนหน้า">‹</button>
-          <div class="field" style="max-width:200px;">
-            <label>เลือกวันที่</label>
-            <input type="date" id="daily-date">
-          </div>
-          <button class="ghost" id="daily-next-day" title="วันถัดไป">›</button>
+      <div class="card day-nav">
+        <label for="daily-date">เลือกวันที่</label>
+        <div class="day-nav-row">
+          <button class="ghost" id="daily-prev-day" title="วันก่อนหน้า" aria-label="วันก่อนหน้า">‹</button>
+          <input type="date" id="daily-date">
+          <button class="ghost" id="daily-next-day" title="วันถัดไป" aria-label="วันถัดไป">›</button>
         </div>
+        <button class="ghost day-today" id="daily-today">กลับมาวันนี้</button>
       </div>
       <div class="card" id="daily-grid-container">
         <div class="empty">กำลังโหลด...</div>

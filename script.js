@@ -266,6 +266,13 @@ function updateHeroStatusLine(recordsForTime) {
 // ==========================================================================
 // ยูทิลิตี้ทั่วไป
 // ==========================================================================
+// วันที่ตามเวลาเครื่อง (ไม่ใช้ toISOString เพราะเป็นเวลา UTC ทำให้วันคลาดเคลื่อนในไทย)
+function localDateStr(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function todayStr() { return localDateStr(new Date()); }
+
 function esc(v) {
   return String(v == null ? '' : v).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
@@ -802,7 +809,7 @@ async function updateDutyToday() {
   let inspectors = [], roster = {};
   try { [inspectors, roster] = await Promise.all([listInspectors(), loadRoster()]); } catch (e) {}
   const names = rosterNames(roster, day, inspectors);
-  const info = dutyInfoFor(new Date().toISOString().slice(0, 10), roster, inspectors, session);
+  const info = dutyInfoFor(todayStr(), roster, inspectors, session);
   box.innerHTML = `<span>📅 <b>เวรวัน${DAY_NAMES[day]}:</b> ${names.length ? names.map(esc).join(', ') : 'ยังไม่ได้กำหนดเวร'}
     ${info.substitute ? '<br><small class="sub-note">วันนี้คุณไม่ได้อยู่เวร ตรวจแทนได้ ระบบจะบันทึกว่า "แทน"</small>' : ''}</span>
     <button class="ghost" id="duty-week-btn">ดูทั้งสัปดาห์</button>`;
@@ -1098,7 +1105,7 @@ document.getElementById('room').addEventListener('change', updateTeacherHint);
 async function updateUntestedReminder() {
   const el = document.getElementById('untested-reminder');
   if (!el) return;
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayStr();
   const dayOfWeek = new Date(todayStr + 'T00:00:00').getDay();
   if (dayOfWeek === 0 || dayOfWeek === 6) {
     el.style.display = 'none';
@@ -1312,7 +1319,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const isEditing = !!state.editingKey;
   const grade = document.getElementById('grade').value;
   const room = document.getElementById('room').value;
-  const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
+  const date = document.getElementById('date').value || todayStr();
   if (!session) { showMsg(msgArea, 'หมดเวลาการเข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่', 'err'); return; }
   const inspector = isEditing ? (state.editingInspector || '') : session.name;
   const inspectorId = isEditing ? (state.editingInspectorId || null) : session.id;
@@ -1422,7 +1429,7 @@ async function loadLandingSummary() {
     return;
   }
 
-  const todayKey = getISOWeekInfo(new Date().toISOString().slice(0, 10)).key;
+  const todayKey = getISOWeekInfo(todayStr()).key;
   const roomTotals = {};
   records.forEach(r => {
     if (getISOWeekInfo(r.date).key !== todayKey) return;
@@ -1673,24 +1680,24 @@ function showCriteriaInfoModal() {
 // ==========================================================================
 document.getElementById('daily-date').addEventListener('change', loadDaily);
 
-document.getElementById('daily-prev-day').addEventListener('click', () => {
+// เลื่อนวัน: ข้ามเสาร์-อาทิตย์ให้อัตโนมัติ (วันหยุดไม่มีการตรวจ)
+function stepDay(dir) {
   const input = document.getElementById('daily-date');
-  const d = new Date((input.value || new Date().toISOString().slice(0,10)) + 'T00:00:00');
-  d.setDate(d.getDate() - 1);
-  input.value = d.toISOString().slice(0, 10);
+  const d = new Date((input.value || todayStr()) + 'T00:00:00');
+  do { d.setDate(d.getDate() + dir); } while (d.getDay() === 0 || d.getDay() === 6);
+  input.value = localDateStr(d);
   loadDaily();
-});
-document.getElementById('daily-next-day').addEventListener('click', () => {
-  const input = document.getElementById('daily-date');
-  const d = new Date((input.value || new Date().toISOString().slice(0,10)) + 'T00:00:00');
-  d.setDate(d.getDate() + 1);
-  input.value = d.toISOString().slice(0, 10);
+}
+document.getElementById('daily-prev-day').addEventListener('click', () => stepDay(-1));
+document.getElementById('daily-next-day').addEventListener('click', () => stepDay(1));
+document.getElementById('daily-today').addEventListener('click', () => {
+  document.getElementById('daily-date').value = todayStr();
   loadDaily();
 });
 
 async function loadDaily() {
   const dateInput = document.getElementById('daily-date');
-  if (!dateInput.value) dateInput.value = new Date().toISOString().slice(0,10);
+  if (!dateInput.value) dateInput.value = todayStr();
   const targetDate = dateInput.value;
   const container = document.getElementById('daily-grid-container');
   container.innerHTML = '<div class="empty">กำลังโหลด...</div>';
@@ -2070,7 +2077,7 @@ document.getElementById('export-csv-btn').addEventListener('click', async () => 
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `classroom-cleanliness-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `classroom-cleanliness-${todayStr()}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2104,8 +2111,8 @@ applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dar
 initStorage();
 buildGradeOptions();
 buildCriteria();
-document.getElementById('date').value = new Date().toISOString().slice(0,10);
-document.getElementById('daily-date').value = new Date().toISOString().slice(0,10);
+document.getElementById('date').value = todayStr();
+document.getElementById('daily-date').value = todayStr();
 updateScore();
 updateTeacherHint();
 updatePendingBadge();
